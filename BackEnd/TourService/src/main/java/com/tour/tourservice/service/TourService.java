@@ -39,7 +39,7 @@ class TourServiceImpl implements TourService {
 	public void add(TourDTO tourDTO) {
 		Tour tour = modelMapper.map(tourDTO, Tour.class);	
 		tourRepository.save(tour);
-		tourDTO.setId_tour(tour.getId_tour());
+		tourDTO.setId_tour(tour.getId_tour());          
 		// TODO Auto-generated method stub
 
 	}
