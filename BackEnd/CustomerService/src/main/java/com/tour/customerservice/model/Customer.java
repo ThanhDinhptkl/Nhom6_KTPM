@@ -3,8 +3,12 @@ package com.tour.customerservice.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.sql.Timestamp;
+import java.util.Collection;
+import java.util.Collections;
 
 @Data
 @NoArgsConstructor
@@ -37,5 +41,9 @@ public class Customer {
 
     public enum Role {
         CUSTOMER, ADMIN, GUIDE
+    }
+
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 }
