@@ -55,6 +55,14 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public void resetPassword(Integer id) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        customer.setPassword(passwordEncoder.encode("12345")); // Reset password về 12345
+        customerRepository.save(customer);
+    }
+
+    @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Customer customer = findByEmail(email);
         return new org.springframework.security.core.userdetails.User(

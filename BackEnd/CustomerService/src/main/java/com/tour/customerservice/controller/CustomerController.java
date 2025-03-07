@@ -44,6 +44,13 @@ public class CustomerController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/admin/resetpassword/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> resetPassword(@PathVariable Integer id) {
+        customerService.resetPassword(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/admin/customerlist")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Customer>> getAllCustomers() {
