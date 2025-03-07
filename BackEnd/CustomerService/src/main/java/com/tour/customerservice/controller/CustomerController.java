@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api")
 public class CustomerController {
@@ -17,33 +19,41 @@ public class CustomerController {
     @Autowired
     private CustomerService customerService;
 
-    @GetMapping("/email/{email}")
+    @GetMapping("/customer/email/{email}")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<Customer> getCustomerByEmail(@PathVariable String email) {
         Customer customer = customerService.findByEmail(email);
         return ResponseEntity.ok(customer);
     }
 
-    @GetMapping("/phone/{phone}")
+    @GetMapping("/customer/phone/{phone}")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<Customer> getCustomerByPhone(@PathVariable String phone) {
         Customer customer = customerService.findByPhone(phone);
         return ResponseEntity.ok(customer);
     }
 
-    @GetMapping("/customer/dashboard")
-    @PreAuthorize("hasRole('CUSTOMER')")
-    public String customerDashboard() {
-        return "Welcome to Customer Dashboard!";
+    @GetMapping("/admin/customerlist")
+    public ResponseEntity<List<Customer>> getAllCustomers() {
+        List<Customer> customers = customerService.findAllCustomers();
+        return ResponseEntity.ok(customers);
     }
 
-    @GetMapping("/admin/dashboard")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String adminDashboard() {
-        return "Welcome to Admin Dashboard!";
-    }
-
-    @GetMapping("/guide/dashboard")
-    @PreAuthorize("hasRole('GUIDE')")
-    public String guideDashboard() {
-        return "Welcome to Guide Dashboard!";
-    }
+//    @GetMapping("/customer/dashboard")
+//    @PreAuthorize("hasRole('CUSTOMER')")
+//    public String customerDashboard() {
+//        return "Welcome to Customer Dashboard!";
+//    }
+//
+//    @GetMapping("/admin/dashboard")
+//    @PreAuthorize("hasRole('ADMIN')")
+//    public String adminDashboard() {
+//        return "Welcome to Admin Dashboard!";
+//    }
+//
+//    @GetMapping("/guide/dashboard")
+//    @PreAuthorize("hasRole('GUIDE')")
+//    public String guideDashboard() {
+//        return "Welcome to Guide Dashboard!";
+//    }
 }

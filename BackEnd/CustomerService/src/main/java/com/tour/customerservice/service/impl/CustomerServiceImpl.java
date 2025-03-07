@@ -9,6 +9,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class CustomerServiceImpl implements CustomerService {
 
@@ -35,6 +37,11 @@ public class CustomerServiceImpl implements CustomerService {
     public Customer findByPhone(String phone) {
         return customerRepository.findByPhone(phone)
                 .orElseThrow(() -> new RuntimeException("User not found with phone: " + phone));
+    }
+
+    @Override
+    public List<Customer> findAllCustomers() {
+        return customerRepository.findAll();
     }
 
     @Override
