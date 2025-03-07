@@ -32,6 +32,12 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public Customer findByPhone(String phone) {
+        return customerRepository.findByPhone(phone)
+                .orElseThrow(() -> new RuntimeException("User not found with phone: " + phone));
+    }
+
+    @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Customer customer = findByEmail(email);
         return new org.springframework.security.core.userdetails.User(
