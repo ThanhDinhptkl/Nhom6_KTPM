@@ -52,9 +52,13 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Vô hiệu hóa CSRF
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // Cho phép truy cập công khai
-                        .requestMatchers("/api/customer/**").hasRole("CUSTOMER") // Phân quyền cho CUSTOMER
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN") // Phân quyền cho ADMIN
-                        .requestMatchers("/api/guide/**").hasRole("GUIDE") // Phân quyền cho GUIDE
+                        .requestMatchers("/api/customer/email/**").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
+                        .requestMatchers("/api/customer/phone/**").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
+                        .requestMatchers("/api/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
+                        .requestMatchers("/api/customer/change-password").hasRole("CUSTOMER") // Chỉ CUSTOMER mới được đổi mật khẩu
+                        .requestMatchers("/api/admin/delete/**").hasRole("ADMIN") // Chỉ ADMIN mới được xóa người dùng
+                        .requestMatchers("/api/resetpassword/**").hasRole("ADMIN") // Chỉ ADMIN mới được reset password
+                        .requestMatchers("/api/admin/customerlist").hasRole("ADMIN") // Chỉ ADMIN mới được xem danh sách khách hàng
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

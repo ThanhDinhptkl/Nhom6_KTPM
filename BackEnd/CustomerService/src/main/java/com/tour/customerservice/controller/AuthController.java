@@ -1,5 +1,6 @@
 package com.tour.customerservice.controller;
 
+import com.tour.customerservice.dto.CustomerLoginDTO;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.service.CustomerService;
 import com.tour.customerservice.util.JwtUtil;
@@ -27,7 +28,7 @@ public class AuthController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/login")
-    public ResponseEntity<?> createAuthenticationToken(@RequestBody Customer customer) throws Exception {
+    public ResponseEntity<?> createAuthenticationToken(@RequestBody CustomerLoginDTO customer) throws Exception {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword()));
 
