@@ -11,4 +11,5 @@ public interface CustomerService extends UserDetailsService {
     Customer findByPhone(String phone); // Tìm kiếm người dùng theo số điện thoại
     List<Customer> findAllCustomers(); // Lấy tất cả khách hàng
     Customer updateCustomer(Customer customer); // Cập nhật thông tin khách hàng
+    void deleteCustomer(Integer id); // Xóa khách hàng
 }

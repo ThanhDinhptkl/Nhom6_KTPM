@@ -17,26 +17,35 @@ public class CustomerController {
     private CustomerService customerService;
 
     @GetMapping("/customer/email/{email}")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     public ResponseEntity<Customer> getCustomerByEmail(@PathVariable String email) {
         Customer customer = customerService.findByEmail(email);
         return ResponseEntity.ok(customer);
     }
 
     @GetMapping("/customer/phone/{phone}")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     public ResponseEntity<Customer> getCustomerByPhone(@PathVariable String phone) {
         Customer customer = customerService.findByPhone(phone);
         return ResponseEntity.ok(customer);
     }
 
     @PutMapping("/customer/update")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     public ResponseEntity<Customer> updateCustomer(@RequestBody Customer customer) {
         Customer updatedCustomer = customerService.updateCustomer(customer);
         return ResponseEntity.ok(updatedCustomer);
     }
 
+    @DeleteMapping("/admin/delete/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteCustomer(@PathVariable Integer id) {
+        customerService.deleteCustomer(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/admin/customerlist")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Customer>> getAllCustomers() {
         List<Customer> customers = customerService.findAllCustomers();
         return ResponseEntity.ok(customers);
