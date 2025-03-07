@@ -5,10 +5,7 @@ import com.tour.customerservice.service.CustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -31,6 +28,12 @@ public class CustomerController {
     public ResponseEntity<Customer> getCustomerByPhone(@PathVariable String phone) {
         Customer customer = customerService.findByPhone(phone);
         return ResponseEntity.ok(customer);
+    }
+
+    @PutMapping("/customer/update")
+    public ResponseEntity<Customer> updateCustomer(@RequestBody Customer customer) {
+        Customer updatedCustomer = customerService.updateCustomer(customer);
+        return ResponseEntity.ok(updatedCustomer);
     }
 
     @GetMapping("/admin/customerlist")
