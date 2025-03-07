@@ -13,4 +13,5 @@ public interface CustomerService extends UserDetailsService {
     Customer updateCustomer(Customer customer); // Cập nhật thông tin khách hàng
     void deleteCustomer(Integer id); // Xóa khách hàng
     void resetPassword(Integer id); // Reset mật khẩu về 12345
+    void changePassword(Integer id, String oldPassword, String newPassword); // Đổi mật khẩu
 }

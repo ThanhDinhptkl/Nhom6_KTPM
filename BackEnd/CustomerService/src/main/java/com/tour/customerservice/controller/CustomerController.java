@@ -1,5 +1,6 @@
 package com.tour.customerservice.controller;
 
+import com.tour.customerservice.dto.ChangePasswordDTO;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.service.CustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,14 +18,14 @@ public class CustomerController {
     private CustomerService customerService;
 
     @GetMapping("/customer/email/{email}")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Customer> getCustomerByEmail(@PathVariable String email) {
         Customer customer = customerService.findByEmail(email);
         return ResponseEntity.ok(customer);
     }
 
     @GetMapping("/customer/phone/{phone}")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Customer> getCustomerByPhone(@PathVariable String phone) {
         Customer customer = customerService.findByPhone(phone);
         return ResponseEntity.ok(customer);
@@ -35,6 +36,13 @@ public class CustomerController {
     public ResponseEntity<Customer> updateCustomer(@RequestBody Customer customer) {
         Customer updatedCustomer = customerService.updateCustomer(customer);
         return ResponseEntity.ok(updatedCustomer);
+    }
+
+    @PostMapping("/customer/changepassword")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Void> changePassword(@RequestBody ChangePasswordDTO request) {
+        customerService.changePassword(request.getId(), request.getOldPassword(), request.getNewPassword());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/admin/delete/{id}")

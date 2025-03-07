@@ -55,6 +55,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/customer/email/**").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
                         .requestMatchers("/api/customer/phone/**").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
                         .requestMatchers("/api/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
+                        .requestMatchers("/api/customer/change-password").hasRole("CUSTOMER") // Chỉ CUSTOMER mới được đổi mật khẩu
                         .requestMatchers("/api/admin/delete/**").hasRole("ADMIN") // Chỉ ADMIN mới được xóa người dùng
                         .requestMatchers("/api/resetpassword/**").hasRole("ADMIN") // Chỉ ADMIN mới được reset password
                         .requestMatchers("/api/admin/customerlist").hasRole("ADMIN") // Chỉ ADMIN mới được xem danh sách khách hàng

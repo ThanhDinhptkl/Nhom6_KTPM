@@ -63,6 +63,21 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public void changePassword(Integer id, String oldPassword, String newPassword) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+
+        // Kiểm tra mật khẩu cũ
+        if (!passwordEncoder.matches(oldPassword, customer.getPassword())) {
+            throw new RuntimeException("Old password is incorrect");
+        }
+
+        // Cập nhật mật khẩu mới
+        customer.setPassword(passwordEncoder.encode(newPassword));
+        customerRepository.save(customer);
+    }
+
+    @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Customer customer = findByEmail(email);
         return new org.springframework.security.core.userdetails.User(
