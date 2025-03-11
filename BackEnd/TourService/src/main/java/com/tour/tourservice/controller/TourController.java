@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tour.tourservice.dto.TourDTO;
+import com.tour.tourservice.model.Tour;
 import com.tour.tourservice.service.TourService;
 
 @RestController
@@ -29,6 +31,13 @@ public class TourController {
 		return tourDTO;
 	}
 	
+	//add list tours
+	@PostMapping("/tours")
+	public List<TourDTO> addTours(@RequestBody List<TourDTO> tourDTOs) {
+		tourService.addList(tourDTOs);
+		return tourDTOs;
+	}
+	
 	//get all
 	@GetMapping("/tours")
 	public List<TourDTO> getAll() {
@@ -41,9 +50,40 @@ public class TourController {
 				.orElse(new ResponseEntity<TourDTO>(HttpStatus.NOT_FOUND));
 	}
 	
+
+	@GetMapping("/tours/location/{location}")
+    public ResponseEntity<List<Tour>> getToursByLocation(@PathVariable String location) {
+        List<Tour> tours = tourService.findByLocation(location);
+        if (tours.isEmpty()) {
+            return ResponseEntity.status(404).body(null); // Không tìm thấy
+        }
+        return ResponseEntity.ok(tours); // Trả về danh sách tour
+    }
+	
+	@GetMapping("/tours/title/{title}")
+	    public ResponseEntity<List<Tour>> getToursByTitle(@PathVariable String title) {
+        List<Tour> tours = tourService.findByTitle(title);
+        if (tours.isEmpty()) {
+            return ResponseEntity.status(404).body(null); // Không tìm thấy
+        }
+        return ResponseEntity.ok(tours); // Trả về danh sách tour
+	}
+	
+	@GetMapping("/tours/price")
+    public ResponseEntity<List<Tour>> getToursByPriceRange(
+            @RequestParam("minPrice") double minPrice,
+            @RequestParam("maxPrice") double maxPrice) {
+        List<Tour> tours = tourService.findByPriceRange(minPrice, maxPrice);
+        if (tours.isEmpty()) {
+            return ResponseEntity.status(404).body(null);
+        }
+        return ResponseEntity.ok(tours);
+    }
+	
 	@DeleteMapping("/tour/{id}")
-	public void delete(@PathVariable(name = "id") int id) {
-		tourService.delete(id);
+	public ResponseEntity<String> delete(@PathVariable(name = "id") int id) {
+	    tourService.delete(id); // Gọi service để xóa
+	    return ResponseEntity.ok("Xóa tour thành công"); // Trả về thông báo
 	}
 	
 	@PutMapping("/tour")
