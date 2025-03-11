@@ -2,6 +2,7 @@ package com.tour.tourservice.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,14 +15,23 @@ import com.tour.tourservice.repository.TourRepository;
 
 public interface TourService {
 	void add(TourDTO tourDTO);
+	
+	//add list tour
+	void addList(List<TourDTO> tourDTOs);
 
 	void update(TourDTO tourDTO);
 
 	void delete(int id);
 
 	List<TourDTO> getAll();
+	
+	List<Tour> findByLocation(String location);
+	
+	List<Tour> findByTitle(String title);
 
 	TourDTO getOne(int id);
+	
+	List<Tour> findByPriceRange(double minPrice, double maxPrice);
 
 }
 
@@ -34,6 +44,7 @@ class TourServiceImpl implements TourService {
 	
 	@Autowired
 	ModelMapper modelMapper;
+	
 	
 	@Override
 	public void add(TourDTO tourDTO) {
@@ -86,4 +97,40 @@ class TourServiceImpl implements TourService {
 	}
 		return null;
 	}
+
+	@Override
+	public void addList(List<TourDTO> tourDTOs) {
+		// TODO Auto-generated method stub
+		for (TourDTO tourDTO : tourDTOs) {
+			Tour tour = modelMapper.map(tourDTO, Tour.class);
+			tourRepository.save(tour);
+			tourDTO.setId_tour(tour.getId_tour());
+		}
+		
+	}
+
+	@Override
+	public List<Tour> findByLocation(String location) {
+		// TODO Auto-generated method stub
+		
+		return tourRepository.findByLocation(location);
+	}
+
+	@Override
+	public List<Tour> findByTitle(String title) {
+	    return tourRepository.findAll().stream()
+	            .filter(tour -> tour.getTitle().toLowerCase().contains(title.toLowerCase()))
+	            .collect(Collectors.toList());
+	}
+
+	@Override
+	public List<Tour> findByPriceRange(double minPrice, double maxPrice) {
+	    if (minPrice > maxPrice) {
+	        throw new IllegalArgumentException("minPrice phải nhỏ hơn hoặc bằng maxPrice");
+	    }
+	    return tourRepository.findByPriceBetween(minPrice, maxPrice).stream()
+	            .sorted((t1, t2) -> Double.compare(t1.getPrice(), t2.getPrice())) // Sắp xếp tăng dần
+	            .collect(Collectors.toList());
+	}
+
 }
