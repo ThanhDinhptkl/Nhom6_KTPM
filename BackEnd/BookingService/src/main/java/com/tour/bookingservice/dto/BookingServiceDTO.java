@@ -1,6 +1,9 @@
 package com.tour.bookingservice.dto;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
+
 
 import lombok.Data;
 
@@ -10,7 +13,7 @@ public class BookingServiceDTO {
 	private int user_id;
 	private int tour_id;
 	private Date booking_date;
-	private String status;
+	private Status status;
 	private int number_of_people;
 	private double total_price;
 	private Date created_at;
@@ -38,10 +41,12 @@ public class BookingServiceDTO {
 	public void setBooking_date(Date booking_date) {
 		this.booking_date = booking_date;
 	}
-	public String getStatus() {
+
+	public Status getStatus() {
 		return status;
 	}
-	public void setStatus(String status) {
+	
+	public void setStatus(Status status) {
 		this.status = status;
 	}
 	public int getNumber_of_people() {
@@ -61,6 +66,9 @@ public class BookingServiceDTO {
 	}
 	public void setCreated_at(Date created_at) {
 		this.created_at = created_at;
+	}
+	public enum Status {
+		PENDING, CONFIRMED, CANCELLED
 	}
 
 }
