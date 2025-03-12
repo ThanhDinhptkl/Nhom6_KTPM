@@ -1,13 +1,21 @@
 package com.tour.bookingservice.entities;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
+
+
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
+
 import lombok.Data;
 
 @Entity
@@ -16,26 +24,29 @@ import lombok.Data;
 public class Booking {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Integer id;
-	
+	private int id;
+
 	@Column(name = "user_id")
 	private int user_id;
-	
+
 	@Column(name = "tour_id")
 	private int tour_id;
-	
+
 	@Column(name = "booking_date")
 	private Date booking_date;
-	
-	@Column(name = "status")
-	private String status;
-	
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "status", nullable = false)
+	private Status status;
+
+
+
 	@Column(name = "number_of_people")
 	private int number_of_people;
-	
+
 	@Column(name = "total_price")
 	private double total_price;
-	
+
 	@Column(name = "created_at")
 	private Date created_at;
 
@@ -43,8 +54,11 @@ public class Booking {
 		super();
 		// TODO Auto-generated constructor stub
 	}
+	public enum Status {
+		PENDING, CONFIRMED, CANCELLED
+	}
 
-	public Booking(int id, int user_id, int tour_id, Date booking_date, String status, int number_of_people,
+	public Booking(int id, int user_id, int tour_id, Date booking_date, Status status, int number_of_people,
 			double total_price, Date created_at) {
 		super();
 		this.id = id;
@@ -57,11 +71,12 @@ public class Booking {
 		this.created_at = created_at;
 	}
 
-	public Integer getId() {
+
+	public int getId() {
 		return id;
 	}
 
-	public void setId(Integer id) {
+	public void setId(int id) {
 		this.id = id;
 	}
 
@@ -89,11 +104,11 @@ public class Booking {
 		this.booking_date = booking_date;
 	}
 
-	public String getStatus() {
+	public Status getStatus() {
 		return status;
 	}
-
-	public void setStatus(String status) {
+	
+	public void setStatus(Status status) {
 		this.status = status;
 	}
 
@@ -120,5 +135,5 @@ public class Booking {
 	public void setCreated_at(Date created_at) {
 		this.created_at = created_at;
 	}
-	
+
 }
