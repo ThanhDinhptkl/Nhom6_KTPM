@@ -11,10 +11,17 @@ spring:
           uri: lb://CUSTOMERSERVICE
           predicates:
             - Path=/customer/**
-        - id: message-service
+        # Route cho /tour
+        - id: tour-service-single
           uri: lb://TOURSERVICE
           predicates:
             - Path=/tour/**
+
+        # Route cho /tours
+        - id: tour-service-multiple
+          uri: lb://TOURSERVICE
+          predicates:
+            - Path=/tours/**
 
 eureka:
   client:
