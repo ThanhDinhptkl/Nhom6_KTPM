@@ -22,6 +22,16 @@ spring:
           uri: lb://TOURSERVICE
           predicates:
             - Path=/tours/**
+        # Route cho BookingService
+        - id: booking-service-single
+          uri: lb://BOOKINGSERVICE
+          predicates:
+            - Path=/booking/**
+
+        - id: booking-service-multiple
+          uri: lb://BOOKINGSERVICE
+          predicates:
+            - Path=/bookings/**
 
 eureka:
   client:
