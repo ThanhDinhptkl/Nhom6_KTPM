@@ -1,6 +1,9 @@
 package com.tour.customerservice.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
@@ -12,6 +15,7 @@ import java.util.Collections;
 
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "customer")
 public class Customer {
@@ -20,27 +24,37 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    @Column(name = "name", nullable = false, length = 255)
+    @Column(name = "name", length = 255, columnDefinition = "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     private String name;
 
-    @Column(name = "email", nullable = false, unique = true, length = 255)
+    @Column(name = "email", unique = true, length = 255)
     private String email;
 
-    @Column(name = "password", nullable = false, length = 255)
+    @Column(name = "password", length = 255)
     private String password;
 
-    @Column(name = "phone", nullable = false, length = 20)
+    @Column(name = "phone", length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
-    private Role role;
+    private Role role = Role.CUSTOMER;  // Mặc định là CUSTOMER
 
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    @Column(name = "created_at", updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private Timestamp createdAt;
 
     public enum Role {
-        CUSTOMER, ADMIN, GUIDE
+        CUSTOMER, ADMIN, GUIDE;
+
+        @JsonCreator
+        public static Role fromString(String value) {
+            return Role.valueOf(value.toUpperCase());
+        }
+
+        @JsonValue
+        public String toString() {
+            return name();
+        }
     }
 
     public Collection<? extends GrantedAuthority> getAuthorities() {

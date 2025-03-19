@@ -78,6 +78,11 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public Customer saveCustomer(Customer customer) {
+        return customerRepository.save(customer);
+    }
+
+    @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Customer customer = findByEmail(email);
         return new org.springframework.security.core.userdetails.User(

@@ -4,10 +4,13 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,7 +19,16 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    private static final SecretKey SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256); // Key an toàn
+    @Value("${jwt.secret}") // Lấy key từ application.properties
+    private String secret;
+
+    private SecretKey secretKey;
+
+    @PostConstruct
+    public void init() {
+        byte[] keyBytes = Base64.getDecoder().decode(secret);
+        secretKey = Keys.hmacShaKeyFor(keyBytes);
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -33,7 +45,7 @@ public class JwtUtil {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+                .setSigningKey(secretKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -45,6 +57,11 @@ public class JwtUtil {
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
+        // Thêm role vào claims
+        claims.put("role", userDetails.getAuthorities().stream()
+                .map(grantedAuthority -> grantedAuthority.getAuthority())
+                .findFirst()
+                .orElse("ROLE_CUSTOMER"));
         return createToken(claims, userDetails.getUsername());
     }
 
@@ -53,8 +70,8 @@ public class JwtUtil {
                 .setClaims(claims)
                 .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 giờ
-                .signWith(SECRET_KEY) // Sử dụng key an toàn
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24 * 7)) // 7 ngày
+                .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
