@@ -1,9 +1,14 @@
 server:
   port: 8080
 
+jwt:
+  secret: pR8dXJZtG6qM9wKf3uYvL2sBzT4cV1oX5nA7mN0QWgE
+
 spring:
   application:
     name: api-gateway
+  main:
+    allow-bean-definition-overriding: true
   cloud:
     gateway:
       routes:
@@ -11,27 +16,34 @@ spring:
           uri: lb://CUSTOMERSERVICE
           predicates:
             - Path=/customer/**
-        # Route cho /tour
-        - id: tour-service-single
+
+        - id: tour-service
           uri: lb://TOURSERVICE
           predicates:
             - Path=/tour/**
+          filters:
+            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
 
-        # Route cho /tours
-        - id: tour-service-multiple
+        - id: tour-service
           uri: lb://TOURSERVICE
           predicates:
             - Path=/tours/**
-        # Route cho BookingService
-        - id: booking-service-single
-          uri: lb://BOOKINGSERVICE
+          filters:
+            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
+
+        - id: booking-service
+          uri: lb://ORDERSERVICE
           predicates:
             - Path=/booking/**
+          filters:
+            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
 
-        - id: booking-service-multiple
-          uri: lb://BOOKINGSERVICE
+        - id: booking-service
+          uri: lb://ORDERSERVICE
           predicates:
             - Path=/bookings/**
+          filters:
+            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
 
 eureka:
   client:
