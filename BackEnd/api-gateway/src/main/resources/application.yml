@@ -17,6 +17,11 @@ spring:
           predicates:
             - Path=/customer/**
 
+        - id: oauth-service
+          uri: lb://CUSTOMERSERVICE
+          predicates:
+            - Path=/oauth2/**
+
         - id: tour-service
           uri: lb://TOURSERVICE
           predicates:
