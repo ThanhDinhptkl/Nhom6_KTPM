@@ -45,7 +45,8 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             "GET:/tours",     // GET danh sách tour
             "GET:/tours/.*",     // GET danh sách tour sau khi lọc
             "GET:/tour/\\d+", // GET chi tiết tour
-            "/customer/.*"    // Tất cả CustomerService
+            "/customer/.*",  // Tất cả CustomerService
+            "/oauth2/.*"
     );
 
     private static final Map<String, Set<String>> ROUTE_ROLES = Map.of(
