@@ -14,6 +14,10 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -51,7 +55,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Vô hiệu hóa CSRF
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/customer/auth/**").permitAll() // Cho phép truy cập công khai
+                        .requestMatchers("/customer/auth/**", "/oauth2/**").permitAll() // Cho phép truy cập công khai
                         .requestMatchers("/customer/email/**").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
                         .requestMatchers("/customer/phone/**").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
                         .requestMatchers("/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
@@ -61,13 +65,22 @@ public class SecurityConfig {
                         .requestMatchers("/customer/customerlist").hasRole("ADMIN") // Chỉ ADMIN mới được xem danh sách khách hàng
                         .anyRequest().authenticated()
                 )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService()))
+                        .defaultSuccessUrl("/customer/auth/login/google", true)
+                )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Sử dụng session STATELESS
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 );
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public OAuth2UserService<OAuth2UserRequest, OAuth2User> oAuth2UserService() {
+        return new DefaultOAuth2UserService();
     }
 }

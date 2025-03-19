@@ -1,0 +1,7 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            scope: profile, email
