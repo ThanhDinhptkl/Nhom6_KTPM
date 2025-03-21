@@ -10,9 +10,9 @@ public interface CustomerService extends UserDetailsService {
     Customer findByEmail(String email); // Tìm kiếm người dùng theo email
     Customer findByPhone(String phone); // Tìm kiếm người dùng theo số điện thoại
     List<Customer> findAllCustomers(); // Lấy tất cả khách hàng
-    Customer updateCustomer(Customer customer); // Cập nhật thông tin khách hàng
+    Customer updateCustomer(String token, Customer customer); // Cập nhật thông tin khách hàng
     void deleteCustomer(Integer id); // Xóa khách hàng
     void resetPassword(Integer id); // Reset mật khẩu về 12345
-    void changePassword(Integer id, String oldPassword, String newPassword); // Đổi mật khẩu
+    void changePassword(String token, String oldPassword, String newPassword); // Đổi mật khẩu
     Customer saveCustomer(Customer customer);
 }

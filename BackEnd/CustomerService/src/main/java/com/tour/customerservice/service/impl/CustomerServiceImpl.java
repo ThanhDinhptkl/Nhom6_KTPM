@@ -3,7 +3,9 @@ package com.tour.customerservice.service.impl;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.repository.CustomerRepository;
 import com.tour.customerservice.service.CustomerService;
+import com.tour.customerservice.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +21,9 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @Override
     public Customer registerCustomer(Customer customer) {
@@ -45,8 +50,30 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public Customer updateCustomer(Customer customer) {
-        return customerRepository.save(customer);
+    public Customer updateCustomer(String token, Customer updatedCustomer) {
+        try {
+            String currentUserEmail = jwtUtil.extractUsername(token);
+            System.out.println("currentUserEmail: " + currentUserEmail);
+            if (currentUserEmail == null || currentUserEmail.isEmpty()) {
+                throw new RuntimeException("Invalid token");
+            }
+
+            Customer existingCustomer = customerRepository.findByEmail(currentUserEmail)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            // Chỉ cho phép cập nhật nếu email trong token khớp với email của khách hàng
+            if (!existingCustomer.getEmail().equals(updatedCustomer.getEmail())) {
+                throw new RuntimeException("Unauthorized to update this account");
+            }
+
+            // Chỉ cập nhật những thông tin cần thiết (tránh ghi đè password)
+            existingCustomer.setName(updatedCustomer.getName());
+            existingCustomer.setPhone(updatedCustomer.getPhone());
+
+            return customerRepository.save(existingCustomer);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid or expired token");
+        }
     }
 
     @Override
@@ -63,18 +90,36 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public void changePassword(Integer id, String oldPassword, String newPassword) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+    public void changePassword(String token, String oldPassword, String newPassword) {
+        try {
+            // Kiểm tra token hợp lệ
+            if (token == null || token.isEmpty()) {
+                throw new RuntimeException("Invalid token format");
+            }
 
-        // Kiểm tra mật khẩu cũ
-        if (!passwordEncoder.matches(oldPassword, customer.getPassword())) {
-            throw new RuntimeException("Old password is incorrect");
+            // Lấy email từ JWT
+            String email;
+            try {
+                email = jwtUtil.extractUsername(token.replace("Bearer ", ""));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid or expired token");
+            }
+
+            // Tìm người dùng
+            Customer customer = findByEmail(email);
+
+            if (!passwordEncoder.matches(oldPassword, customer.getPassword())) {
+                throw new RuntimeException("Old password is incorrect");
+            }
+            customer.setPassword(passwordEncoder.encode(newPassword));
+            customerRepository.save(customer);
+        }catch (io.jsonwebtoken.ExpiredJwtException e) {
+            throw new RuntimeException("Token has expired, please login again.");
+        } catch (io.jsonwebtoken.SignatureException e) {
+            throw new RuntimeException("Invalid JWT signature.");
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid token format.");
         }
-
-        // Cập nhật mật khẩu mới
-        customer.setPassword(passwordEncoder.encode(newPassword));
-        customerRepository.save(customer);
     }
 
     @Override
