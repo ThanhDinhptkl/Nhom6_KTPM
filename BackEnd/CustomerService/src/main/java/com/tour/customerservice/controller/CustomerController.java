@@ -75,6 +75,33 @@ public class CustomerController {
         List<Customer> customers = customerService.findAllCustomers();
         return ResponseEntity.ok(customers);
     }
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile(@RequestHeader(HttpHeaders.AUTHORIZATION) String token) {
+        try {
+            // Lấy email từ token
+            String email = jwtUtil.extractUsername(token.replace("Bearer ", ""));
+
+            // Tìm khách hàng theo email
+            Customer customer = customerService.findByEmail(email);
+            if (customer == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+            }
+
+            // Tạo một bản sao không chứa mật khẩu
+            Customer profileData = new Customer();
+            profileData.setId(customer.getId());
+            profileData.setName(customer.getName());
+            profileData.setEmail(customer.getEmail());
+            profileData.setPhone(customer.getPhone());
+            profileData.setRole(customer.getRole());
+            profileData.setCreatedAt(customer.getCreatedAt());
+
+            return ResponseEntity.ok(profileData);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        }
+    }
+
 
 //    @GetMapping("/customer/dashboard")
 //    @PreAuthorize("hasRole('CUSTOMER')")
