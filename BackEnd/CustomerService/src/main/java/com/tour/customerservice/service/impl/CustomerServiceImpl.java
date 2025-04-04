@@ -11,7 +11,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -133,4 +135,21 @@ public class CustomerServiceImpl implements CustomerService {
         return new org.springframework.security.core.userdetails.User(
                 customer.getEmail(), customer.getPassword(), customer.getAuthorities());
     }
+
+    @Override
+    public Map<String, String> generateTokens(UserDetails userDetails) {
+        String accessToken = jwtUtil.generateToken(userDetails);
+        String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+
+        // Lưu refreshToken vào database
+        Customer customer = findByEmail(userDetails.getUsername());
+        customer.setRefreshToken(refreshToken);
+        customerRepository.save(customer);
+
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("accessToken", accessToken);
+        tokens.put("refreshToken", refreshToken);
+        return tokens;
+    }
+
 }

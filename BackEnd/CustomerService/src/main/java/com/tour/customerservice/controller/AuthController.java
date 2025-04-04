@@ -6,6 +6,7 @@ import com.tour.customerservice.repository.CustomerRepository;
 import com.tour.customerservice.service.CustomerService;
 import com.tour.customerservice.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -16,6 +17,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 
@@ -43,10 +45,11 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword()));
 
         final UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
-        final String jwt = jwtUtil.generateToken(userDetails);
+        Map<String, String> tokens = customerService.generateTokens(userDetails);
 
-        return ResponseEntity.ok(jwt);
+        return ResponseEntity.ok(tokens);
     }
+
     public AuthController(CustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
     }
@@ -62,24 +65,30 @@ public class AuthController {
         Map<String, Object> attributes = oAuth2User.getAttributes();
 
         String email = (String) attributes.get("email");
-        String name = (String) attributes.get("name");
-        String phone = (String) attributes.get("phone");
+        String name = (String) attributes.getOrDefault("name", "Unknown");
+        String phone = (String) attributes.getOrDefault("phone", ""); // thường không có "phone"
 
-        Optional<Customer> existingCustomer = customerRepository.findByEmail(email);
-        Customer customer = existingCustomer.orElseGet(() -> {
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body("Google account missing email");
+        }
+
+        // Tìm hoặc tạo Customer
+        Customer customer = customerRepository.findByEmail(email).orElseGet(() -> {
             Customer newCustomer = new Customer();
             newCustomer.setEmail(email);
-            newCustomer.setName(name != null ? name : "Unknown");
+            newCustomer.setName(name);
             newCustomer.setPhone(phone);
             newCustomer.setRole(Customer.Role.CUSTOMER);
-            newCustomer.setPassword(""); // OAuth2 không có password
+            newCustomer.setPassword(""); // vì dùng Google nên không cần mật khẩu
             return customerRepository.save(newCustomer);
         });
 
+        // Load lại UserDetails để tạo token
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
-        String jwt = jwtUtil.generateToken(userDetails);
 
-        return ResponseEntity.ok(jwt);
+        // Trả về access + refresh token
+        Map<String, String> tokens = customerService.generateTokens(userDetails);
+        return ResponseEntity.ok(tokens);
     }
 
 
@@ -91,6 +100,46 @@ public class AuthController {
             return ResponseEntity.ok(registeredCustomer);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> request) {
+        String refreshToken = request.get("refreshToken");
+
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            return ResponseEntity.badRequest().body("Missing refresh token");
+        }
+
+        try {
+            // Giải mã token và lấy username (email)
+            String email = jwtUtil.extractUsername(refreshToken);
+
+            // Tìm người dùng
+            Customer customer = customerService.findByEmail(email);
+            if (customer == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
+            }
+
+            // So sánh refreshToken gửi lên với token lưu trong DB
+            if (!refreshToken.equals(customer.getRefreshToken())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid refresh token");
+            }
+
+            // Kiểm tra hạn token
+            if (jwtUtil.isTokenExpired(refreshToken)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Refresh token expired");
+            }
+
+            // Tạo token mới
+            UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                    customer.getEmail(), customer.getPassword(), new ArrayList<>());
+            Map<String, String> tokens = customerService.generateTokens(userDetails);
+
+            return ResponseEntity.ok(tokens);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid refresh token format");
         }
     }
 }
