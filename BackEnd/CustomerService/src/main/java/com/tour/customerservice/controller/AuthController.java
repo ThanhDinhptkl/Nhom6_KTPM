@@ -65,24 +65,30 @@ public class AuthController {
         Map<String, Object> attributes = oAuth2User.getAttributes();
 
         String email = (String) attributes.get("email");
-        String name = (String) attributes.get("name");
-        String phone = (String) attributes.get("phone");
+        String name = (String) attributes.getOrDefault("name", "Unknown");
+        String phone = (String) attributes.getOrDefault("phone", ""); // thường không có "phone"
 
-        Optional<Customer> existingCustomer = customerRepository.findByEmail(email);
-        Customer customer = existingCustomer.orElseGet(() -> {
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body("Google account missing email");
+        }
+
+        // Tìm hoặc tạo Customer
+        Customer customer = customerRepository.findByEmail(email).orElseGet(() -> {
             Customer newCustomer = new Customer();
             newCustomer.setEmail(email);
-            newCustomer.setName(name != null ? name : "Unknown");
+            newCustomer.setName(name);
             newCustomer.setPhone(phone);
             newCustomer.setRole(Customer.Role.CUSTOMER);
-            newCustomer.setPassword(""); // OAuth2 không có password
+            newCustomer.setPassword(""); // vì dùng Google nên không cần mật khẩu
             return customerRepository.save(newCustomer);
         });
 
+        // Load lại UserDetails để tạo token
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
-        String jwt = jwtUtil.generateToken(userDetails);
 
-        return ResponseEntity.ok(jwt);
+        // Trả về access + refresh token
+        Map<String, String> tokens = customerService.generateTokens(userDetails);
+        return ResponseEntity.ok(tokens);
     }
 
 
