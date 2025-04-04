@@ -15,12 +15,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tour.bookingservice.dto.BookingServiceDTO;
+import com.tour.bookingservice.dto.TourDTO;
 import com.tour.bookingservice.service.BookingService;
 
 @RestController
 public class BookingServiceController {
 	@Autowired
 	BookingService bookingService;
+	
+	
+	
 	
 	// add new
 	@PostMapping("/booking")
@@ -50,4 +54,10 @@ public class BookingServiceController {
 	public void update(@RequestBody BookingServiceDTO bookingServiceDTO) {
 		bookingService.update(bookingServiceDTO);
 	}
+
+    @GetMapping("/tour/{id}")
+    public ResponseEntity<TourDTO> getTourInfo(@PathVariable int id) {
+        TourDTO tour = bookingService.getTourDetails(id);
+        return tour != null ? ResponseEntity.ok(tour) : ResponseEntity.notFound().build();
+    }
 }

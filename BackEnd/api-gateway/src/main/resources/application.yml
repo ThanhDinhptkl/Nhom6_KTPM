@@ -37,14 +37,14 @@ spring:
             - AuthenticationFilter  # ✅ Áp dụng filter ở đây
 
         - id: booking-service
-          uri: lb://ORDERSERVICE
+          uri: lb://BOOKINGSERVICE
           predicates:
             - Path=/booking/**
           filters:
             - AuthenticationFilter  # ✅ Áp dụng filter ở đây
-
+    
         - id: booking-service
-          uri: lb://ORDERSERVICE
+          uri: lb://BOOKINGSERVICE
           predicates:
             - Path=/bookings/**
           filters:
