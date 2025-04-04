@@ -46,6 +46,9 @@ public class Customer {
     @Column(name = "created_at", updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private Timestamp createdAt;
 
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
     public enum Role {
         CUSTOMER, ADMIN, GUIDE;
 
@@ -62,5 +65,11 @@ public class Customer {
 
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+
+    public enum AuthProvider {
+        LOCAL,
+        GOOGLE,
+        FACEBOOK
     }
 }
