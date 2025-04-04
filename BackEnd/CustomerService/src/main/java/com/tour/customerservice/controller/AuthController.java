@@ -1,6 +1,7 @@
 package com.tour.customerservice.controller;
 
 import com.tour.customerservice.dto.CustomerLoginDTO;
+import com.tour.customerservice.dto.CustomerResponseDTO;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.repository.CustomerRepository;
 import com.tour.customerservice.service.CustomerService;
@@ -109,10 +110,20 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> registerCustomer(@RequestBody Customer customer) {
         try {
-            // Đăng ký người dùng mới
             Customer registeredCustomer = customUserDetailsService.registerCustomer(customer);
 
-            return ResponseEntity.ok(registeredCustomer);
+            // Chuyển sang DTO để trả về
+            CustomerResponseDTO responseDTO = new CustomerResponseDTO();
+            responseDTO.setId(registeredCustomer.getId());
+            responseDTO.setName(registeredCustomer.getName());
+            responseDTO.setEmail(registeredCustomer.getEmail());
+            responseDTO.setPhone(registeredCustomer.getPhone());
+            responseDTO.setCreatedAt(registeredCustomer.getCreatedAt());
+            responseDTO.setRole(registeredCustomer.getRole());
+            responseDTO.setAuthProvider(registeredCustomer.getAuthProvider());
+
+            return ResponseEntity.ok(responseDTO);
+
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
