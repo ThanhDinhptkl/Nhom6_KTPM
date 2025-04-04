@@ -33,6 +33,9 @@ public class Customer {
     @Column(name = "password", length = 255)
     private String password;
 
+    @Column(name = "refresh_token", length = 512)
+    private String refreshToken;
+
     @Column(name = "phone", length = 20)
     private String phone;
 

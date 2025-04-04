@@ -1,9 +1,11 @@
 package com.tour.customerservice.service;
 
 import com.tour.customerservice.model.Customer;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 import java.util.List;
+import java.util.Map;
 
 public interface CustomerService extends UserDetailsService {
     Customer registerCustomer(Customer customer); // Đăng ký người dùng mới
@@ -15,4 +17,5 @@ public interface CustomerService extends UserDetailsService {
     void resetPassword(Integer id); // Reset mật khẩu về 12345
     void changePassword(String token, String oldPassword, String newPassword); // Đổi mật khẩu
     Customer saveCustomer(Customer customer);
+    public Map<String, String> generateTokens(UserDetails userDetails);
 }
