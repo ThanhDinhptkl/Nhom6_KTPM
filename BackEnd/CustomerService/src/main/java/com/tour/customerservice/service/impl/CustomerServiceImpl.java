@@ -42,7 +42,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer findByPhone(String phone) {
-        return customerRepository.findByPhone(phone)
+        return customerRepository.findByPhone(phone).stream().findFirst()
                 .orElseThrow(() -> new RuntimeException("User not found with phone: " + phone));
     }
 

@@ -1,6 +1,7 @@
 package com.tour.customerservice.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -27,7 +28,7 @@ public class Customer {
     @Column(name = "name", length = 255, columnDefinition = "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     private String name;
 
-    @Column(name = "email", unique = true, length = 255)
+    @Column(name = "email", nullable = false,unique = true, length = 255)
     private String email;
 
     @Column(name = "password", length = 255)
@@ -36,7 +37,7 @@ public class Customer {
     @Column(name = "refresh_token", length = 512)
     private String refreshToken;
 
-    @Column(name = "phone", length = 20)
+    @Column(name = "phone", unique = true, length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)
@@ -45,6 +46,9 @@ public class Customer {
 
     @Column(name = "created_at", updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     private Timestamp createdAt;
+
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
 
     public enum Role {
         CUSTOMER, ADMIN, GUIDE;
@@ -60,7 +64,14 @@ public class Customer {
         }
     }
 
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+
+    public enum AuthProvider {
+        LOCAL,
+        GOOGLE,
+        FACEBOOK
     }
 }
