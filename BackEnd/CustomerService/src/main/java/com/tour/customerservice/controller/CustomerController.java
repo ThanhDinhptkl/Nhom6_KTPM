@@ -1,6 +1,7 @@
 package com.tour.customerservice.controller;
 
 import com.tour.customerservice.dto.ChangePasswordDTO;
+import com.tour.customerservice.dto.CustomerResponseDTO;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.service.CustomerService;
 import com.tour.customerservice.util.JwtUtil;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/customer")
@@ -23,6 +25,18 @@ public class CustomerController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    private CustomerResponseDTO toDTO(Customer customer) {
+        return new CustomerResponseDTO(
+                customer.getId(),
+                customer.getName(),
+                customer.getEmail(),
+                customer.getPhone(),
+                customer.getRole(),
+                customer.getCreatedAt(),
+                customer.getAuthProvider()
+        );
+    }
+
     @GetMapping("/email/{email}")
     public ResponseEntity<Customer> getCustomerByEmail(@PathVariable String email) {
         Customer customer = customerService.findByEmail(email);
@@ -30,9 +44,9 @@ public class CustomerController {
     }
 
     @GetMapping("/phone/{phone}")
-    public ResponseEntity<Customer> getCustomerByPhone(@PathVariable String phone) {
+    public ResponseEntity<?> getCustomerByPhone(@PathVariable String phone) {
         Customer customer = customerService.findByPhone(phone);
-        return ResponseEntity.ok(customer);
+        return ResponseEntity.ok(toDTO(customer));
     }
 
     @PutMapping("/update")
@@ -41,7 +55,7 @@ public class CustomerController {
             @RequestBody Customer customer) {
         try {
             Customer updatedCustomer = customerService.updateCustomer(token.replace("Bearer ", ""), customer);
-            return ResponseEntity.ok(updatedCustomer);
+            return ResponseEntity.ok(toDTO(updatedCustomer));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         }
@@ -71,32 +85,20 @@ public class CustomerController {
     }
 
     @GetMapping("/customerlist")
-    public ResponseEntity<List<Customer>> getAllCustomers() {
+    public ResponseEntity<List<CustomerResponseDTO>> getAllCustomers() {
         List<Customer> customers = customerService.findAllCustomers();
-        return ResponseEntity.ok(customers);
+        List<CustomerResponseDTO> dtos = customers.stream().map(this::toDTO).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
     @GetMapping("/profile")
     public ResponseEntity<?> getProfile(@RequestHeader(HttpHeaders.AUTHORIZATION) String token) {
         try {
-            // Lấy email từ token
             String email = jwtUtil.extractUsername(token.replace("Bearer ", ""));
-
-            // Tìm khách hàng theo email
             Customer customer = customerService.findByEmail(email);
             if (customer == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
             }
-
-            // Tạo một bản sao không chứa mật khẩu
-            Customer profileData = new Customer();
-            profileData.setId(customer.getId());
-            profileData.setName(customer.getName());
-            profileData.setEmail(customer.getEmail());
-            profileData.setPhone(customer.getPhone());
-            profileData.setRole(customer.getRole());
-            profileData.setCreatedAt(customer.getCreatedAt());
-
-            return ResponseEntity.ok(profileData);
+            return ResponseEntity.ok(toDTO(customer));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
         }

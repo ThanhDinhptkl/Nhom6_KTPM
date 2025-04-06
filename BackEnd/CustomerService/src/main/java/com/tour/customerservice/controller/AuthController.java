@@ -1,6 +1,7 @@
 package com.tour.customerservice.controller;
 
 import com.tour.customerservice.dto.CustomerLoginDTO;
+import com.tour.customerservice.dto.CustomerResponseDTO;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.repository.CustomerRepository;
 import com.tour.customerservice.service.CustomerService;
@@ -11,7 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -40,7 +40,21 @@ public class AuthController {
     private final CustomerRepository customerRepository;
 
     @PostMapping("/login")
-    public ResponseEntity<?> createAuthenticationToken(@RequestBody CustomerLoginDTO customer) throws Exception {
+    public ResponseEntity<?> createAuthenticationToken(@RequestBody CustomerLoginDTO customer) {
+        Optional<Customer> customerOpt = customerRepository.findByEmail(customer.getEmail());
+
+        if (customerOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Tài khoản không tồn tại");
+        }
+
+        Customer foundCustomer = customerOpt.get();
+
+        // ⚠️ Nếu tài khoản đăng ký bằng Google, từ chối đăng nhập bằng password
+        if (foundCustomer.getAuthProvider() == Customer.AuthProvider.GOOGLE) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Tài khoản này chỉ hỗ trợ đăng nhập bằng Google");
+        }
+
+        // ✅ Chỉ cho phép khi là LOCAL
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword()));
 
@@ -80,6 +94,7 @@ public class AuthController {
             newCustomer.setPhone(phone);
             newCustomer.setRole(Customer.Role.CUSTOMER);
             newCustomer.setPassword(""); // vì dùng Google nên không cần mật khẩu
+            newCustomer.setAuthProvider(Customer.AuthProvider.GOOGLE);
             return customerRepository.save(newCustomer);
         });
 
@@ -95,9 +110,20 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> registerCustomer(@RequestBody Customer customer) {
         try {
-            // Đăng ký người dùng mới
             Customer registeredCustomer = customUserDetailsService.registerCustomer(customer);
-            return ResponseEntity.ok(registeredCustomer);
+
+            // Chuyển sang DTO để trả về
+            CustomerResponseDTO responseDTO = new CustomerResponseDTO();
+            responseDTO.setId(registeredCustomer.getId());
+            responseDTO.setName(registeredCustomer.getName());
+            responseDTO.setEmail(registeredCustomer.getEmail());
+            responseDTO.setPhone(registeredCustomer.getPhone());
+            responseDTO.setCreatedAt(registeredCustomer.getCreatedAt());
+            responseDTO.setRole(registeredCustomer.getRole());
+            responseDTO.setAuthProvider(registeredCustomer.getAuthProvider());
+
+            return ResponseEntity.ok(responseDTO);
+
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
