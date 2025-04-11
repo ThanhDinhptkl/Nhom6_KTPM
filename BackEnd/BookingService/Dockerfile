@@ -1,19 +1,23 @@
 # Build stage
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Run stage
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
+
+# Install curl for health check
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Copy the JAR file from build stage
 COPY --from=build /app/target/*.jar app.jar
 
 # Add wait-for-it script to handle database connection delays
 ADD https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh /wait-for-it.sh
 RUN chmod +x /wait-for-it.sh
-
 
 # Set default environment variables
 ENV SPRING_PROFILES_ACTIVE=prod
@@ -39,7 +43,7 @@ ENV EUREKA_CLIENT_ENABLED=false
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
 # Expose the application port
-EXPOSE 8080
+EXPOSE 8082
 
 # Entrypoint to run the application 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
