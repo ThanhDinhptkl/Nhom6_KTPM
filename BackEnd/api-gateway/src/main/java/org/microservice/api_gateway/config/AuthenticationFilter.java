@@ -41,13 +41,13 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     }
 
     private static final Set<String> PUBLIC_ENDPOINTS = Set.of(
-            "GET:/tour",      // GET tất cả tour
-            "GET:/tours",     // GET danh sách tour
-            "GET:/tours/.*",     // GET danh sách tour sau khi lọc
+            "GET:/tour", // GET tất cả tour
+            "GET:/tours", // GET danh sách tour
+            "GET:/tours/.*", // GET danh sách tour sau khi lọc
             "GET:/tour/\\d+", // GET chi tiết tour
-            "/customer/.*",  // Tất cả CustomerService
-            "/oauth2/.*"
-    );
+            "POST:/customer/auth/.*",
+            "GET:/customer/auth/.*",
+            "/oauth2/.*");
 
     private static final Map<String, Set<String>> ROUTE_ROLES = Map.of(
             "POST:/tour", Set.of("ROLE_ADMIN"),
@@ -66,8 +66,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             "GET:/bookings", Set.of("ROLE_ADMIN"),
 
             // CUSTOMER, ADMIN có thể hủy booking của mình
-            "DELETE:/booking/\\d+", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")
-    );
+            "DELETE:/booking/\\d+", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN"));
 
     @Override
     public GatewayFilter apply(Config config) {

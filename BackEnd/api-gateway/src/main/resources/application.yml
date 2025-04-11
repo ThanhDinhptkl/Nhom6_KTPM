@@ -22,6 +22,11 @@ spring:
           predicates:
             - Path=/oauth2/**
 
+        - id: oauth2-callback
+          uri: lb://CUSTOMERSERVICE
+          predicates:
+            - Path=/login/oauth2/code/**
+
         - id: tour-service
           uri: lb://TOURSERVICE
           predicates:
@@ -54,3 +59,7 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
