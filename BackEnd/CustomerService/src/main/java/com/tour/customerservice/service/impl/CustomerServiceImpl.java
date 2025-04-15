@@ -3,6 +3,7 @@ package com.tour.customerservice.service.impl;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.repository.CustomerRepository;
 import com.tour.customerservice.service.CustomerService;
+import com.tour.customerservice.service.DatabaseService;
 import com.tour.customerservice.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -27,28 +29,31 @@ public class CustomerServiceImpl implements CustomerService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private DatabaseService databaseService;
+
     @Override
     public Customer registerCustomer(Customer customer) {
         // Mã hóa mật khẩu trước khi lưu vào database
         customer.setPassword(passwordEncoder.encode(customer.getPassword()));
-        return customerRepository.save(customer);
+        return databaseService.executeWithRetry(() -> customerRepository.save(customer));
     }
 
     @Override
     public Customer findByEmail(String email) {
-        return customerRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        return databaseService.executeWithRetry(() -> customerRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email)));
     }
 
     @Override
     public Customer findByPhone(String phone) {
-        return customerRepository.findByPhone(phone).stream().findFirst()
-                .orElseThrow(() -> new RuntimeException("User not found with phone: " + phone));
+        return databaseService.executeWithRetry(() -> customerRepository.findByPhone(phone).stream().findFirst()
+                .orElseThrow(() -> new RuntimeException("User not found with phone: " + phone)));
     }
 
     @Override
     public List<Customer> findAllCustomers() {
-        return customerRepository.findAll();
+        return databaseService.executeWithRetry(() -> customerRepository.findAll());
     }
 
     @Override
@@ -60,19 +65,21 @@ public class CustomerServiceImpl implements CustomerService {
                 throw new RuntimeException("Invalid token");
             }
 
-            Customer existingCustomer = customerRepository.findByEmail(currentUserEmail)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+            return databaseService.executeWithRetry(() -> {
+                Customer existingCustomer = customerRepository.findByEmail(currentUserEmail)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // Chỉ cho phép cập nhật nếu email trong token khớp với email của khách hàng
-            if (!existingCustomer.getEmail().equals(updatedCustomer.getEmail())) {
-                throw new RuntimeException("Unauthorized to update this account");
-            }
+                // Chỉ cho phép cập nhật nếu email trong token khớp với email của khách hàng
+                if (!existingCustomer.getEmail().equals(updatedCustomer.getEmail())) {
+                    throw new RuntimeException("Unauthorized to update this account");
+                }
 
-            // Chỉ cập nhật những thông tin cần thiết (tránh ghi đè password)
-            existingCustomer.setName(updatedCustomer.getName());
-            existingCustomer.setPhone(updatedCustomer.getPhone());
+                // Chỉ cập nhật những thông tin cần thiết (tránh ghi đè password)
+                existingCustomer.setName(updatedCustomer.getName());
+                existingCustomer.setPhone(updatedCustomer.getPhone());
 
-            return customerRepository.save(existingCustomer);
+                return customerRepository.save(existingCustomer);
+            });
         } catch (Exception e) {
             throw new RuntimeException("Invalid or expired token");
         }
@@ -80,15 +87,17 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public void deleteCustomer(Integer id) {
-        customerRepository.deleteById(id);
+        databaseService.executeWithRetryNoReturn(() -> customerRepository.deleteById(id));
     }
 
     @Override
     public void resetPassword(Integer id) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-        customer.setPassword(passwordEncoder.encode("12345")); // Reset password về 12345
-        customerRepository.save(customer);
+        databaseService.executeWithRetryNoReturn(() -> {
+            Customer customer = customerRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+            customer.setPassword(passwordEncoder.encode("12345")); // Reset password về 12345
+            customerRepository.save(customer);
+        });
     }
 
     @Override
@@ -107,15 +116,17 @@ public class CustomerServiceImpl implements CustomerService {
                 throw new RuntimeException("Invalid or expired token");
             }
 
-            // Tìm người dùng
-            Customer customer = findByEmail(email);
+            databaseService.executeWithRetryNoReturn(() -> {
+                // Tìm người dùng
+                Customer customer = findByEmail(email);
 
-            if (!passwordEncoder.matches(oldPassword, customer.getPassword())) {
-                throw new RuntimeException("Old password is incorrect");
-            }
-            customer.setPassword(passwordEncoder.encode(newPassword));
-            customerRepository.save(customer);
-        }catch (io.jsonwebtoken.ExpiredJwtException e) {
+                if (!passwordEncoder.matches(oldPassword, customer.getPassword())) {
+                    throw new RuntimeException("Old password is incorrect");
+                }
+                customer.setPassword(passwordEncoder.encode(newPassword));
+                customerRepository.save(customer);
+            });
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
             throw new RuntimeException("Token has expired, please login again.");
         } catch (io.jsonwebtoken.SignatureException e) {
             throw new RuntimeException("Invalid JWT signature.");
@@ -126,7 +137,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer saveCustomer(Customer customer) {
-        return customerRepository.save(customer);
+        return databaseService.executeWithRetry(() -> customerRepository.save(customer));
     }
 
     @Override
@@ -142,14 +153,16 @@ public class CustomerServiceImpl implements CustomerService {
         String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
         // Lưu refreshToken vào database
-        Customer customer = findByEmail(userDetails.getUsername());
-        customer.setRefreshToken(refreshToken);
-        customerRepository.save(customer);
+        return databaseService.executeWithRetry(() -> {
+            Customer customer = findByEmail(userDetails.getUsername());
+            customer.setRefreshToken(refreshToken);
+            customerRepository.save(customer);
 
-        Map<String, String> tokens = new HashMap<>();
-        tokens.put("accessToken", accessToken);
-        tokens.put("refreshToken", refreshToken);
-        return tokens;
+            Map<String, String> tokens = new HashMap<>();
+            tokens.put("accessToken", accessToken);
+            tokens.put("refreshToken", refreshToken);
+            return tokens;
+        });
     }
 
 }

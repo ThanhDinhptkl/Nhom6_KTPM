@@ -10,8 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -41,27 +43,46 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody CustomerLoginDTO customer) {
-        Optional<Customer> customerOpt = customerRepository.findByEmail(customer.getEmail());
+        try {
+            Optional<Customer> customerOpt = customerRepository.findByEmail(customer.getEmail());
 
-        if (customerOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Tài khoản không tồn tại");
+            if (customerOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Map.of("error", "Tài khoản không tồn tại")
+                );
+            }
+
+            Customer foundCustomer = customerOpt.get();
+
+            if (foundCustomer.getAuthProvider() == Customer.AuthProvider.GOOGLE) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                        Map.of("error", "Tài khoản này chỉ hỗ trợ đăng nhập bằng Google")
+                );
+            }
+
+            // Xác thực thông tin đăng nhập
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword())
+            );
+
+            final UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
+            Map<String, String> tokens = customerService.generateTokens(userDetails);
+
+            return ResponseEntity.ok(tokens);
+
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("error", "Email hoặc mật khẩu không chính xác")
+            );
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("error", "Xác thực thất bại: " + e.getMessage())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Map.of("error", "Lỗi hệ thống: " + e.getMessage())
+            );
         }
-
-        Customer foundCustomer = customerOpt.get();
-
-        // ⚠️ Nếu tài khoản đăng ký bằng Google, từ chối đăng nhập bằng password
-        if (foundCustomer.getAuthProvider() == Customer.AuthProvider.GOOGLE) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Tài khoản này chỉ hỗ trợ đăng nhập bằng Google");
-        }
-
-        // ✅ Chỉ cho phép khi là LOCAL
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword()));
-
-        final UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
-        Map<String, String> tokens = customerService.generateTokens(userDetails);
-
-        return ResponseEntity.ok(tokens);
     }
 
     public AuthController(CustomerRepository customerRepository) {
