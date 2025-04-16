@@ -1,6 +1,7 @@
 package com.tour.customerservice.config;
 
 import com.tour.customerservice.filter.JwtAuthenticationFilter;
+import com.tour.customerservice.filter.RateLimitFilter;
 import com.tour.customerservice.service.CustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -9,6 +10,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -30,7 +33,11 @@ public class SecurityConfig {
     private CustomerService customerService;
 
     @Autowired
+    @Lazy
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -54,27 +61,34 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable()) // Vô hiệu hóa CSRF
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/customer/auth/**", "/oauth2/**").permitAll() // Cho phép truy cập công khai
-                        .requestMatchers("/customer/email/**").hasAnyRole( "ADMIN") // Phân quyền cho ADMIN
+                        .requestMatchers("/customer/auth/**", "/oauth2/**", "/api/rate-limit/status",
+                                "/api/circuit-breaker/**", "/actuator/**")
+                        .permitAll() // Cho phep truy cap cong khai
+                        .requestMatchers("/customer/email/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/phone/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
-                        .requestMatchers("/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
-                        .requestMatchers("/customer/changepassword").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER và ADMIN
+                        .requestMatchers("/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER
+                                                                                             // và ADMIN
+                        .requestMatchers("/customer/changepassword").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho
+                                                                                                     // CUSTOMER và
+                                                                                                     // ADMIN
                         .requestMatchers("/customer/delete/**").hasRole("ADMIN") // Chỉ ADMIN mới được xóa người dùng
-                        .requestMatchers("/customer/resetpassword/**").hasRole("ADMIN") // Chỉ ADMIN mới được reset password
-                        .requestMatchers("/customer/customerlist").hasRole("ADMIN") // Chỉ ADMIN mới được xem danh sách khách hàng
-                        .anyRequest().authenticated()
-                )
+                        .requestMatchers("/customer/resetpassword/**").hasRole("ADMIN") // Chỉ ADMIN mới được reset
+                                                                                        // password
+                        .requestMatchers("/customer/customerlist").hasRole("ADMIN") // Chỉ ADMIN mới được xem danh sách
+                                                                                    // khách hàng
+                        .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService()))
-                        .defaultSuccessUrl("/customer/auth/login/google", true)
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                );
+                        .defaultSuccessUrl("/customer/auth/login/google", true));
+
+        // Thêm Rate Limit Filter trước các filter khác
+        http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        // Thêm JWT Filter
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         http.authenticationProvider(authenticationProvider());
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
