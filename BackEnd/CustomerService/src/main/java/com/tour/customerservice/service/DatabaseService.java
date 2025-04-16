@@ -16,7 +16,7 @@ public interface DatabaseService {
      * @param <T>       Kiểu dữ liệu trả về
      * @return Kết quả từ thao tác
      */
-    @Retryable(value = { SQLException.class }, maxAttempts = 3, backoff = @Backoff(delay = 10000, multiplier = 2))
+    @Retryable(value = { SQLException.class }, maxAttempts = 3, backoff = @Backoff(delay = 5000, multiplier = 2))
     <T> T executeWithRetry(Supplier<T> operation);
 
     /**
@@ -24,6 +24,6 @@ public interface DatabaseService {
      * 
      * @param operation Thao tác cần thực hiện
      */
-    @Retryable(value = { SQLException.class }, maxAttempts = 3, backoff = @Backoff(delay = 10000, multiplier = 2))
+    @Retryable(value = { SQLException.class }, maxAttempts = 3, backoff = @Backoff(delay = 5000, multiplier = 2))
     void executeWithRetryNoReturn(Runnable operation);
 }
