@@ -4,16 +4,15 @@ import com.tour.customerservice.dto.CustomerLoginDTO;
 import com.tour.customerservice.dto.CustomerResponseDTO;
 import com.tour.customerservice.model.Customer;
 import com.tour.customerservice.repository.CustomerRepository;
+import com.tour.customerservice.service.CircuitBreakerService;
 import com.tour.customerservice.service.CustomerService;
 import com.tour.customerservice.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -39,50 +38,34 @@ public class AuthController {
     @Autowired
     private CustomerService customerService;
 
+    @Autowired
+    private CircuitBreakerService circuitBreakerService;
+
     private final CustomerRepository customerRepository;
 
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody CustomerLoginDTO customer) {
-        try {
-            Optional<Customer> customerOpt = customerRepository.findByEmail(customer.getEmail());
+        Optional<Customer> customerOpt = customerRepository.findByEmail(customer.getEmail());
 
-            if (customerOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                        Map.of("error", "Tài khoản không tồn tại")
-                );
-            }
-
-            Customer foundCustomer = customerOpt.get();
-
-            if (foundCustomer.getAuthProvider() == Customer.AuthProvider.GOOGLE) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                        Map.of("error", "Tài khoản này chỉ hỗ trợ đăng nhập bằng Google")
-                );
-            }
-
-            // Xác thực thông tin đăng nhập
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword())
-            );
-
-            final UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
-            Map<String, String> tokens = customerService.generateTokens(userDetails);
-
-            return ResponseEntity.ok(tokens);
-
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    Map.of("error", "Email hoặc mật khẩu không chính xác")
-            );
-        } catch (AuthenticationException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    Map.of("error", "Xác thực thất bại: " + e.getMessage())
-            );
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    Map.of("error", "Lỗi hệ thống: " + e.getMessage())
-            );
+        if (customerOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Tài khoản không tồn tại");
         }
+
+        Customer foundCustomer = customerOpt.get();
+
+        // ⚠️ Nếu tài khoản đăng ký bằng Google, từ chối đăng nhập bằng password
+        if (foundCustomer.getAuthProvider() == Customer.AuthProvider.GOOGLE) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Tài khoản này chỉ hỗ trợ đăng nhập bằng Google");
+        }
+
+        // ✅ Chỉ cho phép khi là LOCAL
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(customer.getEmail(), customer.getPassword()));
+
+        final UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
+        Map<String, String> tokens = circuitBreakerService.generateTokens(userDetails);
+
+        return ResponseEntity.ok(tokens);
     }
 
     public AuthController(CustomerRepository customerRepository) {
@@ -122,16 +105,15 @@ public class AuthController {
         // Load lại UserDetails để tạo token
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(customer.getEmail());
 
-        // Trả về access + refresh token
-        Map<String, String> tokens = customerService.generateTokens(userDetails);
+        // Trả về access + refresh token, sử dụng circuit breaker
+        Map<String, String> tokens = circuitBreakerService.generateTokens(userDetails);
         return ResponseEntity.ok(tokens);
     }
-
 
     @PostMapping("/register")
     public ResponseEntity<?> registerCustomer(@RequestBody Customer customer) {
         try {
-            Customer registeredCustomer = customUserDetailsService.registerCustomer(customer);
+            Customer registeredCustomer = circuitBreakerService.registerCustomer(customer);
 
             // Chuyển sang DTO để trả về
             CustomerResponseDTO responseDTO = new CustomerResponseDTO();
@@ -163,7 +145,7 @@ public class AuthController {
             String email = jwtUtil.extractUsername(refreshToken);
 
             // Tìm người dùng
-            Customer customer = customerService.findByEmail(email);
+            Customer customer = circuitBreakerService.findCustomerByEmail(email);
             if (customer == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
             }
@@ -181,7 +163,7 @@ public class AuthController {
             // Tạo token mới
             UserDetails userDetails = new org.springframework.security.core.userdetails.User(
                     customer.getEmail(), customer.getPassword(), new ArrayList<>());
-            Map<String, String> tokens = customerService.generateTokens(userDetails);
+            Map<String, String> tokens = circuitBreakerService.generateTokens(userDetails);
 
             return ResponseEntity.ok(tokens);
 

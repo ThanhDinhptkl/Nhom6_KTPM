@@ -63,12 +63,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Vô hiệu hóa CSRF
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/customer/auth/**", "/oauth2/**", "/api/rate-limit/status").permitAll() // Cho
-                                                                                                                  // phép
-                                                                                                                  // truy
-                                                                                                                  // cập
-                                                                                                                  // công
-                                                                                                                  // khai
+                        .requestMatchers("/customer/auth/**", "/oauth2/**", "/api/rate-limit/status",
+                                "/api/circuit-breaker/**", "/actuator/**")
+                        .permitAll() // Cho phep truy cap cong khai
                         .requestMatchers("/customer/email/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/phone/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER
