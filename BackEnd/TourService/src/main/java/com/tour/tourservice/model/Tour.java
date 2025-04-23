@@ -21,30 +21,21 @@ public class Tour {
 	    @GeneratedValue(strategy = GenerationType.IDENTITY)
 	    private int id_tour;
 
-	    @Column(name = "title")
 	    private String title;
 
-	    @Column(name = "description")
 	    private String description;
 
-	    @Column(name = "location")
 	    private String location;
 
-	    @Column(name = "duration")
 	    private int duration;
 	    
-	    @Column(name = "price")
 	    private double price;
 
-	    @Column(name = "max_participants")
 	    private int max_participants;
 	    
-	    @Column(name = "start_date")
 	    private Date start_date;
 	    
-	    @Column(name = "end_date")
 	    private Date end_date;
 	    
-	    @Column(name = "created_at")
 	    private Date created_at;
 }
