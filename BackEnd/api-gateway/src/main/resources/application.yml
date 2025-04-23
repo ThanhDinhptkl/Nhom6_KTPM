@@ -10,64 +10,68 @@ spring:
   main:
     allow-bean-definition-overriding: true
   cloud:
-    globalcors:
-      corsConfigurations:
-        '[/**]':
-          allowedOrigins:
-            - "http://localhost:5173"
-          allowedMethods:
-            - GET
-            - POST
-            - PUT
-            - DELETE
-            - OPTIONS
-          allowedHeaders:
-            - "*"
-          allowCredentials: true
     gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin
       routes:
         - id: customer-service
           uri: lb://CUSTOMERSERVICE
           predicates:
             - Path=/customer/**
+          filters:
+            - PreserveHostHeader
+            - StripPrefix=0
+            - AddRequestHeader=X-Forwarded-Prefix, /customer
 
         - id: oauth-service
           uri: lb://CUSTOMERSERVICE
           predicates:
             - Path=/oauth2/**
+          filters:
+            - PreserveHostHeader
+            - StripPrefix=0
+            - AddRequestHeader=X-Forwarded-Prefix, /oauth2
 
         - id: oauth2-callback
           uri: lb://CUSTOMERSERVICE
           predicates:
             - Path=/login/oauth2/code/**
+          filters:
+            - PreserveHostHeader
+            - StripPrefix=0
+            - AddRequestHeader=X-Forwarded-Prefix, /login/oauth2/code
 
         - id: tour-service
           uri: lb://TOURSERVICE
           predicates:
             - Path=/tour/**
           filters:
-            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
+            - AuthenticationFilter
+            - AddRequestHeader=X-Forwarded-Prefix, /tour
 
-        - id: tour-service
+        - id: tour-service-2
           uri: lb://TOURSERVICE
           predicates:
             - Path=/tours/**
           filters:
-            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
+            - AuthenticationFilter
+            - AddRequestHeader=X-Forwarded-Prefix, /tours
 
         - id: booking-service
           uri: lb://BOOKINGSERVICE
           predicates:
             - Path=/booking/**
           filters:
-            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
+            - AuthenticationFilter
+            - AddRequestHeader=X-Forwarded-Prefix, /booking
     
-        - id: booking-service
+        - id: booking-service-2
           uri: lb://BOOKINGSERVICE
           predicates:
             - Path=/bookings/**
           filters:
-            - AuthenticationFilter  # ✅ Áp dụng filter ở đây
+            - AuthenticationFilter
+            - AddRequestHeader=X-Forwarded-Prefix, /bookings
 
 eureka:
   client:
@@ -77,3 +81,4 @@ eureka:
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
+    org.springframework.web.cors: DEBUG
