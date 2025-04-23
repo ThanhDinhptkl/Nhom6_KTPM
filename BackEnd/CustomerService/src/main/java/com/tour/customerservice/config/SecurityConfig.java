@@ -81,7 +81,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService()))
-                        .defaultSuccessUrl("/customer/auth/login/google", true));
+                        .successHandler((request, response, authentication) -> {
+                            // Use forward instead of redirect to preserve the authentication context
+                            request.getRequestDispatcher("/customer/auth/login/google").forward(request, response);
+                        }));
 
         // Thêm Rate Limit Filter trước các filter khác
         http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
