@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Thanh Toán - MoMo & VNPay</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .payment-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .payment-option {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .payment-option h2 {
+            color: #3498db;
+            margin-top: 0;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .btn-momo {
+            background-color: #d82d8b;
+        }
+        .btn-vnpay {
+            background-color: #0066cc;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+            display: none;
+        }
+        .error {
+            color: #721c24;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Demo Thanh Toán - MoMo & VNPay</h1>
+
+    <div class="error" id="errorMessage"></div>
+
+    <div class="payment-container">
+        <div class="payment-option">
+            <h2>Thông tin thanh toán</h2>
+            <div class="form-group">
+                <label for="amount">Số tiền (VND)</label>
+                <input type="number" id="amount" value="10000" min="1000">
+            </div>
+            <div class="form-group">
+                <label for="description">Mô tả</label>
+                <input type="text" id="description" value="Thanh toán tour du lịch">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" value="khachhang@example.com">
+            </div>
+        </div>
+
+        <div class="payment-option">
+            <h2>Chọn cổng thanh toán</h2>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 30px;">
+                <button class="btn btn-momo" onclick="createPayment('MOMO')">Thanh toán qua MoMo</button>
+                <button class="btn btn-vnpay" onclick="createPayment('VNPAY')">Thanh toán qua VNPay</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="result" id="paymentResult">
+        <h2>Kết quả thanh toán</h2>
+        <div id="resultContent"></div>
+    </div>
+
+    <script>
+        // Khi trang được tải, kiểm tra xem có thông tin thanh toán trong URL không
+        document.addEventListener('DOMContentLoaded', function() {
+            // Lấy parameters từ URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('orderId');
+            const paymentMethod = urlParams.get('paymentMethod');
+            
+            // Nếu có orderId, kiểm tra kết quả thanh toán
+            if (orderId) {
+                checkPaymentResult(orderId, paymentMethod, Object.fromEntries(urlParams.entries()));
+            }
+        });
+
+        // Hàm tạo thanh toán mới
+        function createPayment(method) {
+            const amount = document.getElementById('amount').value;
+            const description = document.getElementById('description').value;
+            const email = document.getElementById('email').value;
+            
+            // Kiểm tra dữ liệu đầu vào
+            if (!amount || amount < 1000) {
+                showError('Số tiền phải lớn hơn 1,000 VND');
+                return;
+            }
+            
+            if (!description) {
+                showError('Vui lòng nhập mô tả');
+                return;
+            }
+            
+            // Dữ liệu thanh toán
+            const paymentData = {
+                amount: parseFloat(amount),
+                description: description,
+                customerEmail: email,
+                paymentMethod: method,
+                returnUrl: window.location.origin + window.location.pathname // Trở về trang hiện tại
+            };
+            
+            // Gọi API tạo thanh toán
+            fetch('http://localhost:8085/api/payments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(paymentData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Lỗi khi tạo thanh toán: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Chuyển hướng đến URL thanh toán
+                if (data.paymentUrl) {
+                    window.location.href = data.paymentUrl;
+                } else {
+                    showError('Không có URL thanh toán trong phản hồi');
+                }
+            })
+            .catch(error => {
+                showError('Lỗi: ' + error.message);
+            });
+        }
+        
+        // Kiểm tra kết quả thanh toán
+        function checkPaymentResult(orderId, paymentMethod, allParams) {
+            // Tạo query string từ tất cả các tham số
+            const queryParams = new URLSearchParams(allParams).toString();
+            
+            // Gọi API kiểm tra kết quả thanh toán
+            fetch(`http://localhost:8085/api/payments/result/check?${queryParams}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Lỗi khi kiểm tra thanh toán: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Hiển thị kết quả thanh toán
+                    displayPaymentResult(data);
+                })
+                .catch(error => {
+                    showError('Lỗi: ' + error.message);
+                });
+        }
+        
+        // Hiển thị kết quả thanh toán
+        function displayPaymentResult(payment) {
+            const resultElement = document.getElementById('paymentResult');
+            const contentElement = document.getElementById('resultContent');
+            
+            let html = '';
+            let statusClass = '';
+            let statusText = '';
+            
+            // Thiết lập trạng thái
+            if (payment.status === 'COMPLETED') {
+                statusClass = 'success';
+                statusText = 'Thanh toán thành công';
+            } else if (payment.status === 'FAILED') {
+                statusClass = 'failed';
+                statusText = 'Thanh toán thất bại';
+            } else {
+                statusClass = 'pending';
+                statusText = 'Đang xử lý';
+            }
+            
+            // Tạo HTML hiển thị kết quả
+            html += `<div class="${statusClass}" style="font-weight: bold; margin-bottom: 15px; color: ${statusClass === 'success' ? 'green' : 'red'}">${statusText}</div>`;
+            html += `<p><strong>Mã đơn hàng:</strong> ${payment.orderId}</p>`;
+            html += `<p><strong>Số tiền:</strong> ${payment.amount.toLocaleString('vi-VN')} VND</p>`;
+            html += `<p><strong>Phương thức thanh toán:</strong> ${payment.paymentMethod}</p>`;
+            html += `<p><strong>Mã giao dịch:</strong> ${payment.transactionId}</p>`;
+            
+            if (payment.responseMessage) {
+                html += `<p><strong>Thông báo:</strong> ${payment.responseMessage}</p>`;
+            }
+            
+            contentElement.innerHTML = html;
+            resultElement.style.display = 'block';
+            
+            // Xóa các tham số khỏi URL để tránh làm rối URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
+        // Hiển thị thông báo lỗi
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            // Ẩn thông báo lỗi sau 5 giây
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html> 

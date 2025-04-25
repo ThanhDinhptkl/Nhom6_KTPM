@@ -122,8 +122,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService()))
                         .successHandler((request, response, authentication) -> {
-                            // Use forward instead of redirect to preserve the authentication context
-                            request.getRequestDispatcher("/customer/auth/login/google").forward(request, response);
+                            request.getRequestDispatcher("/customer/auth/oauth2-redirect").forward(request, response);
                         }))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
