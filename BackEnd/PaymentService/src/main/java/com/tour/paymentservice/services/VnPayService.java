@@ -161,11 +161,15 @@ public class VnPayService {
             Payment payment = paymentRepository.findByOrderId(vnp_TxnRef);
 
             if (payment != null) {
+                log.info("Found payment with current status: {}", payment.getStatus());
+
                 // Update payment status
                 if ("00".equals(vnp_ResponseCode)) {
                     payment.setStatus(PaymentStatus.COMPLETED);
+                    log.info("Setting VNPay payment to COMPLETED");
                 } else {
                     payment.setStatus(PaymentStatus.FAILED);
+                    log.info("Setting VNPay payment to FAILED");
                 }
 
                 payment.setResponseCode(vnp_ResponseCode);
@@ -176,7 +180,8 @@ public class VnPayService {
                     payment.setTransactionId(vnp_TransactionNo);
                 }
 
-                paymentRepository.save(payment);
+                Payment savedPayment = paymentRepository.save(payment);
+                log.info("Saved VNPay payment with status: {}", savedPayment.getStatus());
 
                 // Map to response DTO
                 PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
@@ -186,7 +191,7 @@ public class VnPayService {
             log.error("Payment not found for order: {}", vnp_TxnRef);
             return null;
         } catch (Exception e) {
-            log.error("Error processing VNPay callback: {}", e.getMessage());
+            log.error("Error processing VNPay callback: {}", e.getMessage(), e);
             return null;
         }
     }

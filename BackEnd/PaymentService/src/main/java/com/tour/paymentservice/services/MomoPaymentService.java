@@ -1,5 +1,10 @@
 package com.tour.paymentservice.services;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,12 +13,7 @@ import java.util.UUID;
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,55 +34,91 @@ import lombok.extern.slf4j.Slf4j;
 public class MomoPaymentService {
 
     private final PaymentConfig paymentConfig;
-    private final WebClient webClient;
     private final PaymentRepository paymentRepository;
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Create a dedicated HttpClient instance
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_2)
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+
     public PaymentResponseDto createMomoPayment(PaymentRequestDto requestDto) {
         try {
             String transactionId = UUID.randomUUID().toString();
+            String requestId = transactionId;
 
-            // Prepare request body for Momo API
-            Map<String, Object> requestBody = new HashMap<>();
+            // Xây dựng returnUrl đúng format
+            String returnUrl = paymentConfig.getMomoReturnUrl();
+            if (returnUrl == null || returnUrl.isEmpty()) {
+                returnUrl = paymentConfig.getServerBaseUrl() + "/api/payments/momo/return";
+            }
+
+            // Thêm orderId vào returnUrl
+            returnUrl += (returnUrl.contains("?") ? "&" : "?") + "orderId=" + requestDto.getOrderId();
+
+            log.info("Using returnUrl for Momo: {}", returnUrl);
+
+            // Build request body map - matching the exact format from MoMo documentation
+            Map<String, String> requestBody = new HashMap<>();
             requestBody.put("partnerCode", paymentConfig.getMomoPartnerCode());
             requestBody.put("accessKey", paymentConfig.getMomoAccessKey());
-            requestBody.put("requestId", transactionId);
-            requestBody.put("amount", requestDto.getAmount().doubleValue());
+            requestBody.put("requestId", requestId);
+            requestBody.put("amount", String.valueOf(requestDto.getAmount().longValue())); // Convert to string as in
+                                                                                           // example
             requestBody.put("orderId", requestDto.getOrderId());
             requestBody.put("orderInfo", requestDto.getDescription());
-            requestBody.put("returnUrl", requestDto.getReturnUrl());
+            requestBody.put("returnUrl", returnUrl);
             requestBody.put("notifyUrl", paymentConfig.getMomoCallbackUrl());
             requestBody.put("requestType", "captureMoMoWallet");
-            requestBody.put("extraData", "");
+            requestBody.put("extraData",
+                    "email=" + (requestDto.getCustomerEmail() != null ? requestDto.getCustomerEmail() : ""));
 
-            // Generate signature
+            // Generate signature for the request - exactly as in documentation
             String rawSignature = "partnerCode=" + paymentConfig.getMomoPartnerCode() +
                     "&accessKey=" + paymentConfig.getMomoAccessKey() +
-                    "&requestId=" + transactionId +
-                    "&amount=" + requestDto.getAmount().doubleValue() +
+                    "&requestId=" + requestId +
+                    "&amount=" + String.valueOf(requestDto.getAmount().longValue()) +
                     "&orderId=" + requestDto.getOrderId() +
                     "&orderInfo=" + requestDto.getDescription() +
-                    "&returnUrl=" + requestDto.getReturnUrl() +
+                    "&returnUrl=" + returnUrl +
                     "&notifyUrl=" + paymentConfig.getMomoCallbackUrl() +
-                    "&extraData=";
+                    "&extraData=" + requestBody.get("extraData");
 
+            log.info("Raw signature string: {}", rawSignature);
+
+            // Create HMAC SHA256 signature
             String signature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256,
                     paymentConfig.getMomoSecretKey()).hmacHex(rawSignature);
 
+            log.info("Generated signature: {}", signature);
             requestBody.put("signature", signature);
 
-            // Call Momo API
-            String responseBody = webClient.post()
-                    .uri(paymentConfig.getMomoEndpoint())
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .body(BodyInserters.fromValue(requestBody))
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+            // Convert request body to JSON
+            String jsonBody = objectMapper.writeValueAsString(requestBody);
+            log.info("Sending request to MoMo: {}", jsonBody);
+
+            // Make direct HTTP call to MoMo API using Java's HttpClient
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(paymentConfig.getMomoPaymentUrl()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+
+            // Send the request and get the response
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            log.info("MoMo API response status: {}", response.statusCode());
+            log.info("MoMo API response body: {}", response.body());
 
             // Parse response
-            Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
+            Map<String, Object> responseMap = objectMapper.readValue(response.body(), Map.class);
+
+            // Check if the response is successful
+            Object errorCodeObj = responseMap.get("errorCode");
+            String errorCode = (errorCodeObj != null) ? String.valueOf(errorCodeObj) : "ERROR";
+            boolean isSuccessful = "0".equals(errorCode);
 
             // Save payment to database
             Payment payment = Payment.builder()
@@ -90,11 +126,11 @@ public class MomoPaymentService {
                     .transactionId(transactionId)
                     .amount(requestDto.getAmount())
                     .paymentMethod(PaymentMethod.MOMO)
-                    .status(PaymentStatus.PENDING)
+                    .status(isSuccessful ? PaymentStatus.PENDING : PaymentStatus.FAILED)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .paymentUrl((String) responseMap.get("payUrl"))
-                    .responseCode((String) responseMap.get("resultCode"))
+                    .responseCode(errorCode)
                     .responseMessage((String) responseMap.get("message"))
                     .customerEmail(requestDto.getCustomerEmail())
                     .description(requestDto.getDescription())
@@ -107,7 +143,7 @@ public class MomoPaymentService {
             return responseDto;
 
         } catch (Exception e) {
-            log.error("Error creating Momo payment: {}", e.getMessage());
+            log.error("Error creating MoMo payment: {}", e.getMessage(), e);
 
             // Create failed payment record
             Payment payment = Payment.builder()
@@ -134,10 +170,16 @@ public class MomoPaymentService {
 
     public PaymentResponseDto processMomoCallback(String requestData) {
         try {
+            log.info("Processing MoMo callback: {}", requestData);
             Map<String, Object> callbackData = objectMapper.readValue(requestData, Map.class);
 
             String orderId = (String) callbackData.get("orderId");
-            String resultCode = (String) callbackData.get("resultCode");
+
+            // Handle resultCode safely as it could be an Integer
+            Object resultCodeObj = callbackData.get("resultCode");
+            String resultCode = (resultCodeObj != null) ? String.valueOf(resultCodeObj) : "ERROR";
+
+            log.info("MoMo callback for orderId: {}, resultCode: {}", orderId, resultCode);
 
             // Find the payment by orderId
             Payment payment = paymentRepository.findByOrderId(orderId);
@@ -146,62 +188,35 @@ public class MomoPaymentService {
                 // Update payment status
                 if ("0".equals(resultCode)) {
                     payment.setStatus(PaymentStatus.COMPLETED);
+                    log.info("Setting MoMo payment status to COMPLETED for orderId: {}", orderId);
                 } else {
                     payment.setStatus(PaymentStatus.FAILED);
+                    log.info("Setting MoMo payment status to FAILED for orderId: {}", orderId);
                 }
 
                 payment.setResponseCode(resultCode);
                 payment.setResponseMessage((String) callbackData.get("message"));
                 payment.setUpdatedAt(LocalDateTime.now());
 
-                paymentRepository.save(payment);
+                // Ensure transaction ID is saved
+                String transId = (String) callbackData.get("transId");
+                if (transId != null && !transId.isEmpty()) {
+                    payment.setTransactionId(transId);
+                }
+
+                Payment savedPayment = paymentRepository.save(payment);
+                log.info("Saved MoMo payment with status: {}", savedPayment.getStatus());
 
                 // Map to response DTO
                 PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
                 return responseDto;
             }
 
+            log.warn("Payment not found for orderId: {}", orderId);
             return null;
         } catch (JsonProcessingException e) {
-            log.error("Error processing Momo callback: {}", e.getMessage());
+            log.error("Error processing MoMo callback: {}", e.getMessage(), e);
             return null;
         }
-    }
-
-    public String createQrCodePayment(PaymentRequestDto requestDto) {
-        String storeSlug = paymentConfig.getMomoPartnerCode() + "-storeid01"; // Thay đổi theo cấu hình
-        long amount = requestDto.getAmount().longValue();
-        String billId = requestDto.getOrderId();
-
-        // Tạo chữ ký
-        String rawSignature = "storeSlug=" + storeSlug +
-                "&amount=" + amount +
-                "&billId=" + billId;
-        String signature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256,
-                paymentConfig.getMomoSecretKey()).hmacHex(rawSignature);
-
-        // Tạo URI cho QR code
-        String qrCodeUrl = "https://test-payment.momo.vn/pay/store/" + storeSlug +
-                "?a=" + amount +
-                "&b=" + billId +
-                "&s=" + signature;
-
-        // Lưu thông tin thanh toán với QR
-        Payment payment = Payment.builder()
-                .orderId(requestDto.getOrderId())
-                .transactionId(UUID.randomUUID().toString())
-                .amount(requestDto.getAmount())
-                .paymentMethod(PaymentMethod.MOMO)
-                .status(PaymentStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .paymentUrl(qrCodeUrl)
-                .customerEmail(requestDto.getCustomerEmail())
-                .description(requestDto.getDescription())
-                .build();
-
-        paymentRepository.save(payment);
-
-        return qrCodeUrl;
     }
 }

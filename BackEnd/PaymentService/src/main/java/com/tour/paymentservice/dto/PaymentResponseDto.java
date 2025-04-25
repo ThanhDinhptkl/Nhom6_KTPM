@@ -1,6 +1,7 @@
 package com.tour.paymentservice.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import com.tour.paymentservice.entities.PaymentMethod;
 import com.tour.paymentservice.entities.PaymentStatus;
@@ -23,4 +24,5 @@ public class PaymentResponseDto {
     private String paymentUrl;
     private String responseCode;
     private String responseMessage;
+    private LocalDateTime createdAt;
 }

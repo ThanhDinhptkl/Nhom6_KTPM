@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kết quả thanh toán</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .result-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 30px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .success-icon {
+            color: #28a745;
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .error-icon {
+            color: #dc3545;
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .result-header {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .result-details {
+            margin-top: 20px;
+        }
+        .btn-return {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="result-container">
+            <div class="text-center">
+                <div id="statusIcon">
+                    <!-- Icon will be inserted by JavaScript -->
+                </div>
+                <h2 id="resultTitle" class="result-header">Đang xử lý...</h2>
+            </div>
+            
+            <div class="result-details">
+                <div class="row mb-2">
+                    <div class="col-5 fw-bold">Mã giao dịch:</div>
+                    <div id="transactionId" class="col-7">--</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 fw-bold">Phương thức:</div>
+                    <div id="paymentMethod" class="col-7">--</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 fw-bold">Số tiền:</div>
+                    <div id="amount" class="col-7">--</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 fw-bold">Trạng thái:</div>
+                    <div id="status" class="col-7">--</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 fw-bold">Thời gian:</div>
+                    <div id="time" class="col-7">--</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 fw-bold">Mô tả:</div>
+                    <div id="message" class="col-7">--</div>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <a id="returnButton" href="#" class="btn btn-primary btn-return">Quay lại</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const status = urlParams.get('status');
+            const transactionId = urlParams.get('transactionId');
+            const amount = urlParams.get('amount');
+            const message = urlParams.get('message');
+            const paymentMethod = urlParams.get('paymentMethod');
+            const time = urlParams.get('time') || new Date().toLocaleString();
+            const returnUrl = urlParams.get('returnUrl') || '/';
+
+            // Set return button URL
+            document.getElementById('returnButton').href = returnUrl;
+            
+            // Update status icon
+            const statusIcon = document.getElementById('statusIcon');
+            if (status === 'success') {
+                statusIcon.innerHTML = '<i class="success-icon bi bi-check-circle-fill"></i>';
+                document.getElementById('resultTitle').textContent = 'Thanh toán thành công';
+            } else {
+                statusIcon.innerHTML = '<i class="error-icon bi bi-x-circle-fill"></i>';
+                document.getElementById('resultTitle').textContent = 'Thanh toán thất bại';
+            }
+            
+            // Set values
+            document.getElementById('transactionId').textContent = transactionId || 'Không có';
+            document.getElementById('paymentMethod').textContent = paymentMethod || 'Không có';
+            document.getElementById('amount').textContent = amount ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount) : 'Không có';
+            document.getElementById('status').textContent = status === 'success' ? 'Thành công' : 'Thất bại';
+            document.getElementById('time').textContent = time;
+            document.getElementById('message').textContent = message || (status === 'success' ? 'Giao dịch thành công' : 'Giao dịch thất bại');
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</body>
+</html> 
