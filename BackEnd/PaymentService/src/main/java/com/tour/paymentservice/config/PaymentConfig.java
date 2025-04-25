@@ -28,6 +28,12 @@ public class PaymentConfig {
     @Value("${momo.callback-url}")
     private String momoCallbackUrl;
 
+    @Value("${momo.return-url}")
+    private String momoReturnUrl;
+
+    @Value("${app.server.base-url}")
+    private String serverBaseUrl;
+
     // VNPay configuration
     @Value("${vnpay.endpoint}")
     private String vnpayEndpoint;
@@ -49,5 +55,9 @@ public class PaymentConfig {
     @Bean
     public WebClient webClient() {
         return WebClient.builder().build();
+    }
+
+    public String getMomoPaymentUrl() {
+        return momoEndpoint;
     }
 }
