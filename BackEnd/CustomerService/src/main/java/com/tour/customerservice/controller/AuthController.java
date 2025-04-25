@@ -7,6 +7,7 @@ import com.tour.customerservice.repository.CustomerRepository;
 import com.tour.customerservice.service.CircuitBreakerService;
 import com.tour.customerservice.service.CustomerService;
 import com.tour.customerservice.util.JwtUtil;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
@@ -109,6 +111,21 @@ public class AuthController {
         // Trả về access + refresh token, sử dụng circuit breaker
         Map<String, String> tokens = circuitBreakerService.generateTokens(userDetails);
         return ResponseEntity.ok(tokens);
+    }
+
+    @GetMapping("/oauth2-redirect")
+    public void handleOAuth2Redirect(Authentication authentication, HttpServletResponse response) throws IOException {
+        ResponseEntity<?> tokenResponse = oauth2Success(authentication);
+        if (tokenResponse.getStatusCode().is2xxSuccessful() && tokenResponse.getBody() instanceof Map) {
+            Map<String, String> tokens = (Map<String, String>) tokenResponse.getBody();
+            String accessToken = tokens.get("accessToken");
+
+            // Redirect to frontend with token
+            response.sendRedirect("http://localhost:5173/oauth2/success?token=" + accessToken);
+        } else {
+            // Handle error case
+            response.sendRedirect("http://localhost:5173/login?error=authentication_failed");
+        }
     }
 
     @PostMapping("/register")
