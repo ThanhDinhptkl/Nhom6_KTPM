@@ -1,12 +1,7 @@
 package com.tour.paymentservice.controllers;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +21,7 @@ import java.time.LocalDateTime;
  * Controller dedicated to handling MoMo payment requests
  */
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/api/payments/momo")
 @RequiredArgsConstructor
 @Slf4j
