@@ -1,6 +1,7 @@
 package com.tour.paymentservice.controllers;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.servlet.view.RedirectView;
 
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
  * Controller để xử lý các trang web
  */
 @Controller
+@CrossOrigin(origins = "*")
 @Slf4j
 public class WebController {
 
