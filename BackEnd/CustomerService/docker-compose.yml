@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -8,7 +6,8 @@ services:
     env_file:
       - .env
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://db:3306/tour
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/tour
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
     depends_on:
       - db
     networks:
@@ -16,7 +15,7 @@ services:
     restart: on-failure:3
 
   db:
-    image: mariadb:10.6
+    image: mysql:8.0
     env_file:
       - .env
     environment:
@@ -25,7 +24,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
     networks:
       - customer-network
     healthcheck:
@@ -41,4 +40,4 @@ networks:
     driver: bridge
 
 volumes:
-  mariadb_data: 
+  mysql_data: 
