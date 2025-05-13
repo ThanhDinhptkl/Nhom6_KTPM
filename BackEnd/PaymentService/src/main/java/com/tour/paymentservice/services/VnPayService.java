@@ -19,6 +19,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.tour.paymentservice.config.PaymentConfig;
@@ -40,9 +41,13 @@ public class VnPayService {
     private final PaymentConfig paymentConfig;
     private final PaymentRepository paymentRepository;
     private final ModelMapper modelMapper;
+    private final ApplicationContext applicationContext;
 
     public PaymentResponseDto createVnPayPayment(PaymentRequestDto requestDto) {
         try {
+            log.info("Creating VNPay payment for orderId: {}, amount: {}",
+                    requestDto.getOrderId(), requestDto.getAmount());
+
             String transactionId = UUID.randomUUID().toString();
 
             // Get vnp_PayDate
@@ -102,6 +107,7 @@ public class VnPayService {
             queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
 
             String paymentUrl = paymentConfig.getVnpayEndpoint() + "?" + queryUrl;
+            log.info("Generated VNPay payment URL for orderId: {}", requestDto.getOrderId());
 
             // Save payment to database
             Payment payment = Payment.builder()
@@ -117,14 +123,15 @@ public class VnPayService {
                     .description(requestDto.getDescription())
                     .build();
 
-            paymentRepository.save(payment);
+            payment = paymentRepository.save(payment);
+            log.info("Saved VNPay payment in database with id: {}, status: {}", payment.getId(), payment.getStatus());
 
             // Map to response DTO
             PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
             return responseDto;
 
         } catch (Exception e) {
-            log.error("Error creating VNPay payment: {}", e.getMessage());
+            log.error("Error creating VNPay payment: {}", e.getMessage(), e);
 
             // Create failed payment record
             Payment payment = Payment.builder()
@@ -152,43 +159,45 @@ public class VnPayService {
     public PaymentResponseDto processVnPayCallback(Map<String, String> callbackParams) {
         try {
             String vnp_ResponseCode = callbackParams.get("vnp_ResponseCode");
-            String vnp_TxnRef = callbackParams.get("vnp_TxnRef");
+            String vnp_TxnRef = callbackParams.get("vnp_TxnRef"); // Mã đơn hàng
             String vnp_TransactionNo = callbackParams.get("vnp_TransactionNo");
 
-            log.info("Processing VNPay callback for order {}, response code: {}", vnp_TxnRef, vnp_ResponseCode);
+            log.info("Processing VNPay callback for orderId: {}, response code: {}", vnp_TxnRef, vnp_ResponseCode);
 
-            // Find the payment by orderId
-            Payment payment = paymentRepository.findByOrderId(vnp_TxnRef);
+            // Find the payment by orderId - we use the repository directly to get the
+            // entity
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(vnp_TxnRef);
 
-            if (payment != null) {
+            if (!payments.isEmpty()) {
+                Payment payment = payments.get(0); // Get the most recent payment
                 log.info("Found payment with current status: {}", payment.getStatus());
 
-                // Update payment status
+                PaymentStatus newStatus;
+                // Determine new status
                 if ("00".equals(vnp_ResponseCode)) {
-                    payment.setStatus(PaymentStatus.COMPLETED);
+                    newStatus = PaymentStatus.COMPLETED;
                     log.info("Setting VNPay payment to COMPLETED");
                 } else {
-                    payment.setStatus(PaymentStatus.FAILED);
+                    newStatus = PaymentStatus.FAILED;
                     log.info("Setting VNPay payment to FAILED");
                 }
 
-                payment.setResponseCode(vnp_ResponseCode);
-                payment.setResponseMessage("Transaction " + ("00".equals(vnp_ResponseCode) ? "successful" : "failed"));
-                payment.setUpdatedAt(LocalDateTime.now());
+                // Use PaymentService to update status and notify booking service
+                PaymentService paymentService = applicationContext.getBean(PaymentService.class);
+                String responseMessage = "Transaction " + ("00".equals(vnp_ResponseCode) ? "successful" : "failed");
 
-                if (vnp_TransactionNo != null) {
-                    payment.setTransactionId(vnp_TransactionNo);
-                }
+                PaymentResponseDto responseDto = paymentService.updatePaymentStatus(
+                        vnp_TxnRef,
+                        newStatus,
+                        vnp_TransactionNo != null ? vnp_TransactionNo : payment.getTransactionId(),
+                        vnp_ResponseCode,
+                        responseMessage);
 
-                Payment savedPayment = paymentRepository.save(payment);
-                log.info("Saved VNPay payment with status: {}", savedPayment.getStatus());
-
-                // Map to response DTO
-                PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
+                log.info("Updated VNPay payment with status: {} and notified booking service", newStatus);
                 return responseDto;
             }
 
-            log.error("Payment not found for order: {}", vnp_TxnRef);
+            log.error("Payment not found for orderId: {}", vnp_TxnRef);
             return null;
         } catch (Exception e) {
             log.error("Error processing VNPay callback: {}", e.getMessage(), e);
@@ -198,17 +207,19 @@ public class VnPayService {
 
     private String hmacSHA512(String key, String data) {
         try {
-            Mac sha512_HMAC = Mac.getInstance("HmacSHA512");
-            SecretKeySpec secret_key = new SecretKeySpec(key.getBytes(), "HmacSHA512");
-            sha512_HMAC.init(secret_key);
-            byte[] hash = sha512_HMAC.doFinal(data.getBytes());
+            Mac hmac = Mac.getInstance("HmacSHA512");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "HmacSHA512");
+            hmac.init(secretKeySpec);
+            byte[] hash = hmac.doFinal(data.getBytes());
+
+            // Convert bytes to hexadecimal
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
             }
             return sb.toString();
         } catch (Exception e) {
-            log.error("Error creating HMAC-SHA512: {}", e.getMessage());
+            log.error("Error generating HMAC-SHA512: {}", e.getMessage(), e);
             return "";
         }
     }

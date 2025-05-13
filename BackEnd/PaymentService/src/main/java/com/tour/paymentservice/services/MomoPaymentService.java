@@ -7,12 +7,14 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -36,6 +38,7 @@ public class MomoPaymentService {
     private final PaymentConfig paymentConfig;
     private final PaymentRepository paymentRepository;
     private final ModelMapper modelMapper;
+    private final ApplicationContext applicationContext;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Create a dedicated HttpClient instance
@@ -46,6 +49,9 @@ public class MomoPaymentService {
 
     public PaymentResponseDto createMomoPayment(PaymentRequestDto requestDto) {
         try {
+            log.info("Creating MoMo payment for orderId: {}, amount: {}",
+                    requestDto.getOrderId(), requestDto.getAmount());
+
             String transactionId = UUID.randomUUID().toString();
             String requestId = transactionId;
 
@@ -65,8 +71,7 @@ public class MomoPaymentService {
             requestBody.put("partnerCode", paymentConfig.getMomoPartnerCode());
             requestBody.put("accessKey", paymentConfig.getMomoAccessKey());
             requestBody.put("requestId", requestId);
-            requestBody.put("amount", String.valueOf(requestDto.getAmount().longValue())); // Convert to string as in
-                                                                                           // example
+            requestBody.put("amount", String.valueOf(requestDto.getAmount().longValue()));
             requestBody.put("orderId", requestDto.getOrderId());
             requestBody.put("orderInfo", requestDto.getDescription());
             requestBody.put("returnUrl", returnUrl);
@@ -86,13 +91,13 @@ public class MomoPaymentService {
                     "&notifyUrl=" + paymentConfig.getMomoCallbackUrl() +
                     "&extraData=" + requestBody.get("extraData");
 
-            log.info("Raw signature string: {}", rawSignature);
+            log.debug("Raw signature string: {}", rawSignature);
 
             // Create HMAC SHA256 signature
             String signature = new HmacUtils(HmacAlgorithms.HMAC_SHA_256,
                     paymentConfig.getMomoSecretKey()).hmacHex(rawSignature);
 
-            log.info("Generated signature: {}", signature);
+            log.debug("Generated signature: {}", signature);
             requestBody.put("signature", signature);
 
             // Convert request body to JSON
@@ -136,7 +141,8 @@ public class MomoPaymentService {
                     .description(requestDto.getDescription())
                     .build();
 
-            paymentRepository.save(payment);
+            payment = paymentRepository.save(payment);
+            log.info("Saved MoMo payment in database with id: {}, status: {}", payment.getId(), payment.getStatus());
 
             // Map to response DTO
             PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
@@ -182,39 +188,43 @@ public class MomoPaymentService {
             log.info("MoMo callback for orderId: {}, resultCode: {}", orderId, resultCode);
 
             // Find the payment by orderId
-            Payment payment = paymentRepository.findByOrderId(orderId);
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
 
-            if (payment != null) {
+            if (!payments.isEmpty()) {
+                // Get most recent payment
+                Payment payment = payments.get(0);
+
+                PaymentStatus newStatus;
                 // Update payment status
                 if ("0".equals(resultCode)) {
-                    payment.setStatus(PaymentStatus.COMPLETED);
+                    newStatus = PaymentStatus.COMPLETED;
                     log.info("Setting MoMo payment status to COMPLETED for orderId: {}", orderId);
                 } else {
-                    payment.setStatus(PaymentStatus.FAILED);
+                    newStatus = PaymentStatus.FAILED;
                     log.info("Setting MoMo payment status to FAILED for orderId: {}", orderId);
                 }
 
-                payment.setResponseCode(resultCode);
-                payment.setResponseMessage((String) callbackData.get("message"));
-                payment.setUpdatedAt(LocalDateTime.now());
-
-                // Ensure transaction ID is saved
+                // Get transaction ID from MoMo if provided
                 String transId = (String) callbackData.get("transId");
-                if (transId != null && !transId.isEmpty()) {
-                    payment.setTransactionId(transId);
-                }
+                String transactionId = (transId != null && !transId.isEmpty()) ? transId : payment.getTransactionId();
 
-                Payment savedPayment = paymentRepository.save(payment);
-                log.info("Saved MoMo payment with status: {}", savedPayment.getStatus());
+                // Use paymentService to update status and notify booking service
+                // We need to access the PaymentServiceImpl instance, so inject it
+                PaymentService paymentService = applicationContext.getBean(PaymentService.class);
+                PaymentResponseDto responseDto = paymentService.updatePaymentStatus(
+                        orderId,
+                        newStatus,
+                        transactionId,
+                        resultCode,
+                        (String) callbackData.get("message"));
 
-                // Map to response DTO
-                PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
+                log.info("Updated MoMo payment status to {} and notified booking service", newStatus);
                 return responseDto;
+            } else {
+                log.warn("Payment not found for MoMo callback with orderId: {}", orderId);
+                return null;
             }
-
-            log.warn("Payment not found for orderId: {}", orderId);
-            return null;
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.error("Error processing MoMo callback: {}", e.getMessage(), e);
             return null;
         }
