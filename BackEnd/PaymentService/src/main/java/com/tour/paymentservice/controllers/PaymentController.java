@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -43,7 +44,8 @@ public class PaymentController {
 
     @PostMapping
     public ResponseEntity<PaymentResponseDto> createPayment(@RequestBody PaymentRequestDto requestDto) {
-        log.info("Creating payment with method: {}", requestDto.getPaymentMethod());
+        log.info("Creating payment with method: {}, orderId: {}", requestDto.getPaymentMethod(),
+                requestDto.getOrderId());
 
         // Thiết lập orderId nếu không có
         if (requestDto.getOrderId() == null || requestDto.getOrderId().trim().isEmpty()) {
@@ -182,30 +184,35 @@ public class PaymentController {
             return new RedirectView("/payment-result.html?status=failure&message=Không+tìm+thấy+mã+đơn+hàng");
         }
 
-        // Tìm thanh toán trong database
-        Payment payment = paymentRepository.findByOrderId(orderId);
-        if (payment == null) {
+        // Find payment in database
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+        if (payments.isEmpty()) {
             return new RedirectView("/payment-result.html?status=failure&message=Không+tìm+thấy+thông+tin+thanh+toán");
         }
 
-        // Cập nhật trạng thái thanh toán nếu chưa được cập nhật
+        // Get the most recent payment
+        Payment payment = payments.get(0);
+
+        // Update payment status if not already updated
         if (payment.getStatus() == PaymentStatus.PENDING && errorCode != null) {
             boolean isSuccess = "0".equals(errorCode);
-            payment.setStatus(isSuccess ? PaymentStatus.COMPLETED : PaymentStatus.FAILED);
-            payment.setResponseCode(errorCode);
-            payment.setUpdatedAt(LocalDateTime.now());
+            PaymentStatus newStatus = isSuccess ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
 
-            // Lưu transaction ID từ MoMo nếu có
+            // Get transaction ID from MoMo if available
             String transId = returnParams.get("transId");
-            if (transId != null && !transId.isEmpty()) {
-                payment.setTransactionId(transId);
-            }
 
-            paymentRepository.save(payment);
-            log.info("Updated payment status to {} for orderId: {}", payment.getStatus(), orderId);
+            // Use paymentService to update status and notify booking service
+            PaymentResponseDto updatedPayment = paymentService.updatePaymentStatus(
+                    orderId,
+                    newStatus,
+                    transId != null ? transId : payment.getTransactionId(),
+                    errorCode,
+                    isSuccess ? "Payment completed" : "Payment failed");
+
+            log.info("Updated payment status to {} for orderId: {}", newStatus, orderId);
         }
 
-        // Xây dựng URL redirect với đầy đủ thông tin
+        // Build redirect URL with payment information
         StringBuilder url = new StringBuilder("/payment-result.html?");
         boolean isSuccess = payment.getStatus() == PaymentStatus.COMPLETED;
         url.append("status=").append(isSuccess ? "success" : "failure");
@@ -216,5 +223,68 @@ public class PaymentController {
         url.append("&time=").append(payment.getUpdatedAt().toString());
 
         return new RedirectView(url.toString());
+    }
+
+    /**
+     * Webhook endpoint for MoMo IPN (Instant Payment Notification)
+     */
+    @PostMapping("/momo/ipn")
+    @ResponseBody
+    public String processMomoIpn(@RequestBody Map<String, Object> ipnData) {
+        log.info("Received MoMo IPN webhook: {}", ipnData);
+
+        // Get orderId and resultCode from IPN data
+        String orderId = (String) ipnData.get("orderId");
+        Object resultCodeObj = ipnData.get("resultCode");
+        String resultCode = (resultCodeObj != null) ? String.valueOf(resultCodeObj) : "ERROR";
+
+        if (orderId == null) {
+            log.error("MoMo IPN missing orderId");
+            return "FAIL";
+        }
+
+        log.info("Processing MoMo IPN for orderId={}, resultCode={}", orderId, resultCode);
+
+        try {
+            // Find payment by orderId
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+            if (payments.isEmpty()) {
+                log.error("Payment not found for orderId: {}", orderId);
+                return "FAIL";
+            }
+
+            Payment payment = payments.get(0);
+
+            // Only update if payment is still PENDING
+            if (payment.getStatus() == PaymentStatus.PENDING) {
+                PaymentStatus newStatus;
+                if ("0".equals(resultCode)) {
+                    newStatus = PaymentStatus.COMPLETED;
+                } else {
+                    newStatus = PaymentStatus.FAILED;
+                }
+
+                // Get transaction ID if available
+                String transId = (String) ipnData.get("transId");
+
+                // Update payment status
+                PaymentResponseDto result = paymentService.updatePaymentStatus(
+                        orderId,
+                        newStatus,
+                        transId != null ? transId : payment.getTransactionId(),
+                        resultCode,
+                        (String) ipnData.get("message"));
+
+                log.info("Successfully updated payment status from MoMo IPN: {}", newStatus);
+            } else {
+                log.info("Payment already in final state: {}, no update needed", payment.getStatus());
+            }
+
+            // Return success to MoMo
+            return "OK";
+        } catch (Exception e) {
+            log.error("Error processing MoMo IPN: {}", e.getMessage(), e);
+            return "FAIL";
+        }
     }
 }
