@@ -1,6 +1,7 @@
 package com.tour.paymentservice.controllers;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -17,6 +18,7 @@ import com.tour.paymentservice.entities.PaymentMethod;
 import com.tour.paymentservice.entities.PaymentStatus;
 import com.tour.paymentservice.repositories.PaymentRepository;
 import com.tour.paymentservice.services.MomoPaymentService;
+import com.tour.paymentservice.services.PaymentServiceImpl;
 import com.tour.paymentservice.services.VnPayService;
 
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class PaymentResultController {
     private final PaymentRepository paymentRepository;
     private final MomoPaymentService momoPaymentService;
     private final VnPayService vnPayService;
+    private final PaymentServiceImpl paymentService;
 
     /**
      * Endpoint chung để kiểm tra trạng thái thanh toán từ các cổng thanh toán khác
@@ -54,61 +57,23 @@ public class PaymentResultController {
         log.info("Checking payment result for orderId: {}, method: {}, params: {}", orderId, paymentMethod, allParams);
 
         // Tìm thanh toán trong database
-        Payment payment = paymentRepository.findByOrderId(orderId);
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
 
-        if (payment == null) {
+        if (payments.isEmpty()) {
             log.warn("Payment not found for orderId: {}", orderId);
             return ResponseEntity.notFound().build();
         }
 
+        // Get the most recent payment
+        Payment payment = payments.get(0);
+
         // Cập nhật trạng thái thanh toán dựa vào phương thức thanh toán
         if (payment.getStatus() == PaymentStatus.PENDING) {
-            if (payment.getPaymentMethod() == PaymentMethod.MOMO) {
-                // Xử lý kết quả từ MoMo
-                String resultCode = allParams.get("resultCode");
-                if (resultCode != null) {
-                    if ("0".equals(resultCode)) {
-                        payment.setStatus(PaymentStatus.COMPLETED);
-                        log.info("Updating MoMo payment status to COMPLETED for orderId: {}", orderId);
-                    } else {
-                        payment.setStatus(PaymentStatus.FAILED);
-                        log.info("Updating MoMo payment status to FAILED for orderId: {}", orderId);
-                    }
-
-                    payment.setResponseCode(resultCode);
-                    payment.setUpdatedAt(LocalDateTime.now());
-                    paymentRepository.save(payment);
-                }
-            } else if (payment.getPaymentMethod() == PaymentMethod.VNPAY) {
-                // Xử lý kết quả từ VNPay
-                String vnp_ResponseCode = allParams.get("vnp_ResponseCode");
-                if (vnp_ResponseCode != null) {
-                    if ("00".equals(vnp_ResponseCode)) {
-                        payment.setStatus(PaymentStatus.COMPLETED);
-                        log.info("Updating VNPay payment status to COMPLETED for orderId: {}", orderId);
-                    } else {
-                        payment.setStatus(PaymentStatus.FAILED);
-                        log.info("Updating VNPay payment status to FAILED for orderId: {}", orderId);
-                    }
-
-                    payment.setResponseCode(vnp_ResponseCode);
-                    payment.setUpdatedAt(LocalDateTime.now());
-                    paymentRepository.save(payment);
-                }
-            }
+            updatePaymentStatus(payment, allParams);
         }
 
         // Trả về thông tin thanh toán đã cập nhật
-        PaymentResponseDto responseDto = new PaymentResponseDto();
-        responseDto.setOrderId(payment.getOrderId());
-        responseDto.setTransactionId(payment.getTransactionId());
-        responseDto.setAmount(payment.getAmount());
-        responseDto.setStatus(payment.getStatus());
-        responseDto.setPaymentMethod(payment.getPaymentMethod());
-        responseDto.setResponseCode(payment.getResponseCode());
-        responseDto.setResponseMessage(payment.getResponseMessage());
-        responseDto.setPaymentUrl(payment.getPaymentUrl());
-
+        PaymentResponseDto responseDto = paymentService.getPaymentByOrderId(orderId);
         return ResponseEntity.ok(responseDto);
     }
 
@@ -125,10 +90,14 @@ public class PaymentResultController {
         log.info("Redirecting to payment result page for orderId: {}, method: {}", orderId, paymentMethod);
 
         // Tìm thanh toán trong database
-        Payment payment = paymentRepository.findByOrderId(orderId);
-        if (payment == null) {
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+
+        if (payments.isEmpty()) {
             return new RedirectView("/payment-result.html?status=failure&message=Không+tìm+thấy+thông+tin+thanh+toán");
         }
+
+        // Get the most recent payment
+        Payment payment = payments.get(0);
 
         // Cập nhật trạng thái thanh toán nếu cần
         updatePaymentStatus(payment, allParams);
@@ -152,26 +121,37 @@ public class PaymentResultController {
             return; // Không cập nhật nếu đã hoàn thành hoặc thất bại
         }
 
+        String transactionId = null;
+        String responseCode = null;
+        String responseMessage = null;
+        PaymentStatus newStatus = null;
+
         if (payment.getPaymentMethod() == PaymentMethod.MOMO) {
             String errorCode = params.get("errorCode");
             if (errorCode != null) {
-                payment.setStatus("0".equals(errorCode) ? PaymentStatus.COMPLETED : PaymentStatus.FAILED);
-                payment.setResponseCode(errorCode);
-                payment.setUpdatedAt(LocalDateTime.now());
-                paymentRepository.save(payment);
-                log.info("Updated MOMO payment status to {} for orderId: {}",
-                        payment.getStatus(), payment.getOrderId());
+                newStatus = "0".equals(errorCode) ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
+                responseCode = errorCode;
+                transactionId = params.get("transId");
+                responseMessage = "0".equals(errorCode) ? "Thanh toán thành công" : "Thanh toán thất bại";
             }
         } else if (payment.getPaymentMethod() == PaymentMethod.VNPAY) {
             String vnp_ResponseCode = params.get("vnp_ResponseCode");
             if (vnp_ResponseCode != null) {
-                payment.setStatus("00".equals(vnp_ResponseCode) ? PaymentStatus.COMPLETED : PaymentStatus.FAILED);
-                payment.setResponseCode(vnp_ResponseCode);
-                payment.setUpdatedAt(LocalDateTime.now());
-                paymentRepository.save(payment);
-                log.info("Updated VNPAY payment status to {} for orderId: {}",
-                        payment.getStatus(), payment.getOrderId());
+                newStatus = "00".equals(vnp_ResponseCode) ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
+                responseCode = vnp_ResponseCode;
+                transactionId = params.get("vnp_TransactionNo");
+                responseMessage = "00".equals(vnp_ResponseCode) ? "Thanh toán thành công" : "Thanh toán thất bại";
             }
+        }
+
+        if (newStatus != null) {
+            // Sử dụng phương thức cập nhật mới, sẽ thông báo cho booking service
+            paymentService.updatePaymentStatus(
+                    payment.getOrderId(),
+                    newStatus,
+                    transactionId,
+                    responseCode,
+                    responseMessage);
         }
     }
 }

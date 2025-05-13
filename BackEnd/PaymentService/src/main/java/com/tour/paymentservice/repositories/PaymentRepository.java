@@ -5,9 +5,13 @@ import org.springframework.stereotype.Repository;
 
 import com.tour.paymentservice.entities.Payment;
 
+import java.util.List;
+
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
-    Payment findByOrderId(String orderId);
+    List<Payment> findByOrderId(String orderId);
+
+    List<Payment> findByOrderIdOrderByCreatedAtDesc(String orderId);
 
     Payment findByTransactionId(String transactionId);
 }
