@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Controller dedicated to handling MoMo payment requests
@@ -61,10 +62,13 @@ public class MomoController {
 
             log.info("Processing MoMo callback for orderId: {}, errorCode: {}", orderId, errorCode);
 
-            // Tìm payment trong database
-            Payment payment = paymentRepository.findByOrderId(orderId);
-            if (payment != null) {
-                // Cập nhật trạng thái
+            // Find payment in database
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+            if (!payments.isEmpty()) {
+                // Get the most recent payment
+                Payment payment = payments.get(0);
+
+                // Update status
                 if ("0".equals(errorCode)) {
                     payment.setStatus(PaymentStatus.COMPLETED);
                 } else {
@@ -104,12 +108,15 @@ public class MomoController {
         log.info("Manually checking MoMo payment for orderId: {}, resultCode: {}", orderId, resultCode);
 
         // Find payment in database
-        Payment payment = paymentRepository.findByOrderId(orderId);
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
 
-        if (payment == null) {
+        if (payments.isEmpty()) {
             log.warn("Payment not found for orderId: {}", orderId);
             return ResponseEntity.notFound().build();
         }
+
+        // Get the most recent payment
+        Payment payment = payments.get(0);
 
         // If payment is still PENDING and we have a resultCode, update status
         if (payment.getStatus() == PaymentStatus.PENDING && resultCode != null) {
