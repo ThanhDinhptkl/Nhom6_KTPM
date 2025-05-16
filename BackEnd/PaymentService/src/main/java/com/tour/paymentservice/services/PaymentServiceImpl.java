@@ -130,10 +130,11 @@ public class PaymentServiceImpl implements PaymentService {
      * @param transactionId   Payment gateway transaction ID
      * @param responseCode    Response code from payment gateway
      * @param responseMessage Response message
+     * @param paymentMethod   The payment method that completed the payment
      * @return Updated payment response
      */
     public PaymentResponseDto updatePaymentStatus(String orderId, PaymentStatus status,
-            String transactionId, String responseCode, String responseMessage) {
+            String transactionId, String responseCode, String responseMessage, PaymentMethod paymentMethod) {
 
         List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
         if (payments.isEmpty()) {
@@ -141,8 +142,29 @@ public class PaymentServiceImpl implements PaymentService {
             return null;
         }
 
-        // Get the most recent payment
-        Payment payment = payments.get(0);
+        // Find the payment with matching payment method
+        Payment payment = null;
+        if (paymentMethod != null) {
+            // Find the most recent payment matching the specified payment method
+            for (Payment p : payments) {
+                if (p.getPaymentMethod() == paymentMethod) {
+                    payment = p;
+                    break;
+                }
+            }
+
+            if (payment == null) {
+                log.warn("No payment found with method {} for orderID: {}, using most recent payment", paymentMethod,
+                        orderId);
+                payment = payments.get(0);
+            } else {
+                log.info("Found matching payment with method {} for orderID: {}", paymentMethod, orderId);
+            }
+        } else {
+            // If no payment method is specified, use the most recent one
+            payment = payments.get(0);
+            log.warn("No payment method specified, using most recent payment for orderID: {}", orderId);
+        }
 
         // Update payment status
         payment.setStatus(status);
@@ -158,9 +180,12 @@ public class PaymentServiceImpl implements PaymentService {
         // If status is COMPLETED or FAILED, notify booking service
         if (status == PaymentStatus.COMPLETED || status == PaymentStatus.FAILED) {
             try {
-                boolean notified = bookingServiceClient.notifyPaymentCompletion(orderId, status.name());
+                // Use the payment method from the matched payment for the notification
+                PaymentMethod methodToNotify = payment.getPaymentMethod();
+                boolean notified = bookingServiceClient.notifyPaymentCompletion(orderId, status.name(), methodToNotify);
                 if (notified) {
-                    log.info("Successfully notified booking service");
+                    log.info("Successfully notified booking service about {} payment {}", methodToNotify,
+                            status.name());
                 } else {
                     log.warn("Failed to notify booking service");
                 }
@@ -170,5 +195,13 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         return getPaymentByOrderId(orderId);
+    }
+
+    /**
+     * Overloaded method for backward compatibility
+     */
+    public PaymentResponseDto updatePaymentStatus(String orderId, PaymentStatus status,
+            String transactionId, String responseCode, String responseMessage) {
+        return updatePaymentStatus(orderId, status, transactionId, responseCode, responseMessage, null);
     }
 }

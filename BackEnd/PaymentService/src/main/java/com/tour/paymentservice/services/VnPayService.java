@@ -169,7 +169,20 @@ public class VnPayService {
             List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(vnp_TxnRef);
 
             if (!payments.isEmpty()) {
-                Payment payment = payments.get(0); // Get the most recent payment
+                // Find the most recent VNPAY payment
+                Payment payment = null;
+                for (Payment p : payments) {
+                    if (p.getPaymentMethod() == PaymentMethod.VNPAY) {
+                        payment = p;
+                        break;
+                    }
+                }
+
+                if (payment == null) {
+                    payment = payments.get(0); // Fallback to most recent if no VNPAY payment found
+                    log.warn("No VNPAY payment found for orderId: {}, using most recent payment", vnp_TxnRef);
+                }
+
                 log.info("Found payment with current status: {}", payment.getStatus());
 
                 PaymentStatus newStatus;
@@ -191,7 +204,8 @@ public class VnPayService {
                         newStatus,
                         vnp_TransactionNo != null ? vnp_TransactionNo : payment.getTransactionId(),
                         vnp_ResponseCode,
-                        responseMessage);
+                        responseMessage,
+                        PaymentMethod.VNPAY);
 
                 log.info("Updated VNPay payment with status: {} and notified booking service", newStatus);
                 return responseDto;
