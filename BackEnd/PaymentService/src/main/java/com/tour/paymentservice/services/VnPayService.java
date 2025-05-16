@@ -32,6 +32,9 @@ import com.tour.paymentservice.repositories.PaymentRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.github.resilience4j.retry.annotation.Retry;
+import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -43,117 +46,125 @@ public class VnPayService {
     private final ModelMapper modelMapper;
     private final ApplicationContext applicationContext;
 
-    public PaymentResponseDto createVnPayPayment(PaymentRequestDto requestDto) {
-        try {
-            log.info("Creating VNPay payment for orderId: {}, amount: {}",
-                    requestDto.getOrderId(), requestDto.getAmount());
+    /**
+     * Create VNPay payment with retry and time limiter
+     */
+    @TimeLimiter(name = "vnpayPayment")
+    @Retry(name = "vnpayPayment")
+    public CompletableFuture<PaymentResponseDto> createVnPayPayment(PaymentRequestDto requestDto) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                log.info("Creating VNPay payment for orderId: {}, amount: {}",
+                        requestDto.getOrderId(), requestDto.getAmount());
 
-            String transactionId = UUID.randomUUID().toString();
+                String transactionId = UUID.randomUUID().toString();
 
-            // Get vnp_PayDate
-            Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-            String vnp_CreateDate = formatter.format(cld.getTime());
+                // Get vnp_PayDate
+                Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+                SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+                String vnp_CreateDate = formatter.format(cld.getTime());
 
-            // Add parameters
-            Map<String, String> vnp_Params = new HashMap<>();
-            vnp_Params.put("vnp_Version", "2.1.0");
-            vnp_Params.put("vnp_Command", "pay");
-            vnp_Params.put("vnp_TmnCode", paymentConfig.getVnpayTmnCode());
-            vnp_Params.put("vnp_Amount", String.valueOf(requestDto.getAmount().intValue() * 100));
-            vnp_Params.put("vnp_CurrCode", "VND");
-            vnp_Params.put("vnp_BankCode", "");
-            vnp_Params.put("vnp_TxnRef", requestDto.getOrderId());
-            vnp_Params.put("vnp_OrderInfo", requestDto.getDescription());
-            vnp_Params.put("vnp_OrderType", "other");
-            vnp_Params.put("vnp_Locale", "vn");
-            vnp_Params.put("vnp_ReturnUrl", requestDto.getReturnUrl());
-            vnp_Params.put("vnp_IpAddr", "127.0.0.1");
-            vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+                // Add parameters
+                Map<String, String> vnp_Params = new HashMap<>();
+                vnp_Params.put("vnp_Version", "2.1.0");
+                vnp_Params.put("vnp_Command", "pay");
+                vnp_Params.put("vnp_TmnCode", paymentConfig.getVnpayTmnCode());
+                vnp_Params.put("vnp_Amount", String.valueOf(requestDto.getAmount().intValue() * 100));
+                vnp_Params.put("vnp_CurrCode", "VND");
+                vnp_Params.put("vnp_BankCode", "");
+                vnp_Params.put("vnp_TxnRef", requestDto.getOrderId());
+                vnp_Params.put("vnp_OrderInfo", requestDto.getDescription());
+                vnp_Params.put("vnp_OrderType", "other");
+                vnp_Params.put("vnp_Locale", "vn");
+                vnp_Params.put("vnp_ReturnUrl", requestDto.getReturnUrl());
+                vnp_Params.put("vnp_IpAddr", "127.0.0.1");
+                vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
 
-            // Build data to hash and query string
-            List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
-            Collections.sort(fieldNames);
+                // Build data to hash and query string
+                List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
+                Collections.sort(fieldNames);
 
-            StringBuilder hashData = new StringBuilder();
-            StringBuilder query = new StringBuilder();
+                StringBuilder hashData = new StringBuilder();
+                StringBuilder query = new StringBuilder();
 
-            Iterator<String> itr = fieldNames.iterator();
-            while (itr.hasNext()) {
-                String fieldName = itr.next();
-                String fieldValue = vnp_Params.get(fieldName);
-                if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                    // Build hash data
-                    hashData.append(fieldName);
-                    hashData.append('=');
-                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                Iterator<String> itr = fieldNames.iterator();
+                while (itr.hasNext()) {
+                    String fieldName = itr.next();
+                    String fieldValue = vnp_Params.get(fieldName);
+                    if ((fieldValue != null) && (fieldValue.length() > 0)) {
+                        // Build hash data
+                        hashData.append(fieldName);
+                        hashData.append('=');
+                        hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
 
-                    // Build query
-                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
-                    query.append('=');
-                    query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                        // Build query
+                        query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+                        query.append('=');
+                        query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
 
-                    if (itr.hasNext()) {
-                        query.append('&');
-                        hashData.append('&');
+                        if (itr.hasNext()) {
+                            query.append('&');
+                            hashData.append('&');
+                        }
                     }
                 }
+
+                String queryUrl = query.toString();
+
+                // Create HMAC-SHA512 signature
+                String vnp_SecureHash = hmacSHA512(paymentConfig.getVnpayHashSecret(), hashData.toString());
+                queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
+
+                String paymentUrl = paymentConfig.getVnpayEndpoint() + "?" + queryUrl;
+                log.info("Generated VNPay payment URL for orderId: {}", requestDto.getOrderId());
+
+                // Save payment to database
+                Payment payment = Payment.builder()
+                        .orderId(requestDto.getOrderId())
+                        .transactionId(transactionId)
+                        .amount(requestDto.getAmount())
+                        .paymentMethod(PaymentMethod.VNPAY)
+                        .status(PaymentStatus.PENDING)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
+                        .paymentUrl(paymentUrl)
+                        .customerEmail(requestDto.getCustomerEmail())
+                        .description(requestDto.getDescription())
+                        .build();
+
+                payment = paymentRepository.save(payment);
+                log.info("Saved VNPay payment in database with id: {}, status: {}", payment.getId(),
+                        payment.getStatus());
+
+                // Map to response DTO
+                PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
+                return responseDto;
+
+            } catch (Exception e) {
+                log.error("Error creating VNPay payment: {}", e.getMessage(), e);
+
+                // Create failed payment record
+                Payment payment = Payment.builder()
+                        .orderId(requestDto.getOrderId())
+                        .transactionId(UUID.randomUUID().toString())
+                        .amount(requestDto.getAmount())
+                        .paymentMethod(PaymentMethod.VNPAY)
+                        .status(PaymentStatus.FAILED)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
+                        .responseCode("ERROR")
+                        .responseMessage(e.getMessage())
+                        .customerEmail(requestDto.getCustomerEmail())
+                        .description(requestDto.getDescription())
+                        .build();
+
+                paymentRepository.save(payment);
+
+                // Map to response DTO
+                PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
+                return responseDto;
             }
-
-            String queryUrl = query.toString();
-
-            // Create HMAC-SHA512 signature
-            String vnp_SecureHash = hmacSHA512(paymentConfig.getVnpayHashSecret(), hashData.toString());
-            queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-
-            String paymentUrl = paymentConfig.getVnpayEndpoint() + "?" + queryUrl;
-            log.info("Generated VNPay payment URL for orderId: {}", requestDto.getOrderId());
-
-            // Save payment to database
-            Payment payment = Payment.builder()
-                    .orderId(requestDto.getOrderId())
-                    .transactionId(transactionId)
-                    .amount(requestDto.getAmount())
-                    .paymentMethod(PaymentMethod.VNPAY)
-                    .status(PaymentStatus.PENDING)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .paymentUrl(paymentUrl)
-                    .customerEmail(requestDto.getCustomerEmail())
-                    .description(requestDto.getDescription())
-                    .build();
-
-            payment = paymentRepository.save(payment);
-            log.info("Saved VNPay payment in database with id: {}, status: {}", payment.getId(), payment.getStatus());
-
-            // Map to response DTO
-            PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
-            return responseDto;
-
-        } catch (Exception e) {
-            log.error("Error creating VNPay payment: {}", e.getMessage(), e);
-
-            // Create failed payment record
-            Payment payment = Payment.builder()
-                    .orderId(requestDto.getOrderId())
-                    .transactionId(UUID.randomUUID().toString())
-                    .amount(requestDto.getAmount())
-                    .paymentMethod(PaymentMethod.VNPAY)
-                    .status(PaymentStatus.FAILED)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .responseCode("ERROR")
-                    .responseMessage(e.getMessage())
-                    .customerEmail(requestDto.getCustomerEmail())
-                    .description(requestDto.getDescription())
-                    .build();
-
-            paymentRepository.save(payment);
-
-            // Map to response DTO
-            PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
-            return responseDto;
-        }
+        });
     }
 
     public PaymentResponseDto processVnPayCallback(Map<String, String> callbackParams) {

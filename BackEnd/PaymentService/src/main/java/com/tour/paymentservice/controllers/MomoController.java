@@ -1,5 +1,9 @@
 package com.tour.paymentservice.controllers;
 
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+import org.modelmapper.ModelMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +16,7 @@ import com.tour.paymentservice.entities.PaymentStatus;
 import com.tour.paymentservice.entities.PaymentMethod;
 import com.tour.paymentservice.repositories.PaymentRepository;
 import com.tour.paymentservice.services.MomoPaymentService;
+import com.tour.paymentservice.services.PaymentService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,10 +44,11 @@ public class MomoController {
      * @return Payment response with URL to redirect user
      */
     @PostMapping("/create")
-    public ResponseEntity<PaymentResponseDto> createPayment(@RequestBody PaymentRequestDto requestDto) {
+    public CompletableFuture<ResponseEntity<PaymentResponseDto>> createPayment(
+            @RequestBody PaymentRequestDto requestDto) {
         log.info("Creating MoMo payment: {}", requestDto);
-        PaymentResponseDto responseDto = momoPaymentService.createMomoPayment(requestDto);
-        return ResponseEntity.ok(responseDto);
+        return momoPaymentService.createMomoPayment(requestDto)
+                .thenApply(responseDto -> ResponseEntity.ok(responseDto));
     }
 
     /**
