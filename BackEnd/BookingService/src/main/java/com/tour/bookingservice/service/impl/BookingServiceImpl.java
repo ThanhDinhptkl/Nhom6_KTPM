@@ -122,11 +122,22 @@ class BookingServiceImpl implements BookingService {
 
 	@Override
 	public Map<String, Object> getPaymentStatus(int bookingId) {
-		return paymentServiceClient.getPaymentStatus(bookingId);
+		// Get the booking first to check if it has a payment method
+		Booking booking = bookingrepository.getById(bookingId);
+		if (booking == null) {
+			Map<String, Object> errorResponse = new HashMap<>();
+			errorResponse.put("success", false);
+			errorResponse.put("message", "Booking not found");
+			return errorResponse;
+		}
+
+		// Get payment status using the stored payment method if available
+		String paymentMethod = booking.getPaymentMethod();
+		return paymentServiceClient.getPaymentStatus(bookingId, paymentMethod);
 	}
 
 	@Override
-	public BookingServiceDTO updateBookingAfterPayment(int bookingId, String paymentStatus) {
+	public BookingServiceDTO updateBookingAfterPayment(int bookingId, String paymentStatus, String paymentMethod) {
 		Booking booking = bookingrepository.getById(bookingId);
 		if (booking == null) {
 			return null;
@@ -135,6 +146,11 @@ class BookingServiceImpl implements BookingService {
 		// Update booking status based on payment status
 		if ("COMPLETED".equals(paymentStatus)) {
 			booking.setStatus(Booking.Status.CONFIRMED);
+
+			// Store the payment method that completed the payment
+			if (paymentMethod != null && !paymentMethod.isEmpty()) {
+				booking.setPaymentMethod(paymentMethod);
+			}
 		} else if ("FAILED".equals(paymentStatus)) {
 			booking.setStatus(Booking.Status.CANCELLED);
 		}

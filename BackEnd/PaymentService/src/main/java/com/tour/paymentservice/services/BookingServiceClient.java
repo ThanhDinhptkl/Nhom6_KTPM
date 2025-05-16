@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.tour.paymentservice.entities.PaymentMethod;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Service
@@ -26,9 +28,10 @@ public class BookingServiceClient {
      * 
      * @param orderId       The order ID (now directly the booking ID as String)
      * @param paymentStatus COMPLETED or FAILED
+     * @param paymentMethod The payment method that was used (MOMO, VNPAY)
      * @return true if notification was successful, false otherwise
      */
-    public boolean notifyPaymentCompletion(String orderId, String paymentStatus) {
+    public boolean notifyPaymentCompletion(String orderId, String paymentStatus, PaymentMethod paymentMethod) {
         try {
             // Parse booking ID directly from orderId (no prefix anymore)
             int bookingId;
@@ -43,6 +46,7 @@ public class BookingServiceClient {
             String url = UriComponentsBuilder.fromHttpUrl(bookingServiceUrl + "/booking/payment/webhook")
                     .queryParam("bookingId", bookingId)
                     .queryParam("paymentStatus", paymentStatus)
+                    .queryParam("paymentMethod", paymentMethod)
                     .toUriString();
 
             // Make POST request to booking service
@@ -53,5 +57,12 @@ public class BookingServiceClient {
             log.error("Failed to notify booking service: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Overloaded method for backward compatibility
+     */
+    public boolean notifyPaymentCompletion(String orderId, String paymentStatus) {
+        return notifyPaymentCompletion(orderId, paymentStatus, null);
     }
 }

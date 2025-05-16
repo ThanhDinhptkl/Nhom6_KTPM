@@ -4,8 +4,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 
-
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,7 +12,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
 
 import lombok.Data;
 
@@ -39,7 +36,8 @@ public class Booking {
 	@Column(name = "status", nullable = false)
 	private Status status;
 
-
+	@Column(name = "payment_method")
+	private String paymentMethod;
 
 	@Column(name = "number_of_people")
 	private int number_of_people;
@@ -54,6 +52,7 @@ public class Booking {
 		super();
 		// TODO Auto-generated constructor stub
 	}
+
 	public enum Status {
 		PENDING, CONFIRMED, CANCELLED
 	}
@@ -70,7 +69,6 @@ public class Booking {
 		this.total_price = total_price;
 		this.created_at = created_at;
 	}
-
 
 	public int getId() {
 		return id;
@@ -107,7 +105,7 @@ public class Booking {
 	public Status getStatus() {
 		return status;
 	}
-	
+
 	public void setStatus(Status status) {
 		this.status = status;
 	}
@@ -134,6 +132,14 @@ public class Booking {
 
 	public void setCreated_at(Date created_at) {
 		this.created_at = created_at;
+	}
+
+	public String getPaymentMethod() {
+		return paymentMethod;
+	}
+
+	public void setPaymentMethod(String paymentMethod) {
+		this.paymentMethod = paymentMethod;
 	}
 
 }

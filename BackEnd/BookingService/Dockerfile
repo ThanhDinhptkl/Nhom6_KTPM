@@ -25,19 +25,22 @@ ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
 # Application Configuration
 ENV SPRING_APPLICATION_NAME=BookingService
-ENV SERVER_PORT=5555
+ENV SERVER_PORT=8082
 
-# Database Configuration
-ENV SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/tours?createDatabaseIfNotExist=true
+# Database Configuration - will be overridden by docker-compose
+ENV SPRING_DATASOURCE_URL=jdbc:mysql://booking-db:3306/booking_db?createDatabaseIfNotExist=true
+ENV SPRING_DATASOURCE_USERNAME=root
+ENV SPRING_DATASOURCE_PASSWORD=root
 ENV SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
 
 # Hibernate Configuration
 ENV SPRING_JPA_SHOW_SQL=true
-ENV SPRING_JPA_HIBERNATE_DDL_AUTO=true
+ENV SPRING_JPA_HIBERNATE_DDL_AUTO=update
 
-# Eureka Client Configuration - Temporarily disabled
-# ENV EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
-ENV EUREKA_CLIENT_ENABLED=false
+# Eureka Client Configuration
+ENV EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://14.225.212.208:8761/eureka/
+ENV EUREKA_CLIENT_ENABLED=true
+ENV EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
 
 # Create directory for logs
 RUN mkdir -p /app/logs && chmod 777 /app/logs
