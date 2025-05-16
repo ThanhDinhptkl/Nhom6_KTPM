@@ -9,6 +9,7 @@ import com.tour.paymentservice.dto.PaymentRequestDto;
 import com.tour.paymentservice.dto.PaymentResponseDto;
 import com.tour.paymentservice.entities.Payment;
 import com.tour.paymentservice.entities.PaymentStatus;
+import com.tour.paymentservice.entities.PaymentMethod;
 import com.tour.paymentservice.repositories.PaymentRepository;
 import com.tour.paymentservice.services.MomoPaymentService;
 
@@ -57,16 +58,53 @@ public class MomoController {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(callbackData);
 
-            String orderId = root.path("orderId").asText();
+            String momoOrderId = root.path("orderId").asText();
             String errorCode = root.path("errorCode").asText();
 
-            log.info("Processing MoMo callback for orderId: {}, errorCode: {}", orderId, errorCode);
+            log.info("Processing MoMo callback for momoOrderId: {}, errorCode: {}", momoOrderId, errorCode);
 
-            // Find payment in database
-            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+            // Check if this is a versioned order ID (contains _v)
+            String originalOrderId = momoOrderId;
+            if (momoOrderId.contains("_v")) {
+                // Extract the original order ID from extraData if possible
+                String extraData = root.path("extraData").asText();
+                if (extraData != null && extraData.contains("originalOrderId=")) {
+                    String[] parts = extraData.split("originalOrderId=");
+                    if (parts.length > 1) {
+                        String part = parts[1];
+                        int commaIndex = part.indexOf(",");
+                        originalOrderId = commaIndex > 0 ? part.substring(0, commaIndex) : part;
+                        log.info("Extracted original orderId {} from versioned orderId {}", originalOrderId,
+                                momoOrderId);
+                    }
+                } else {
+                    // If we can't extract from extraData, try to get the part before _v
+                    int vIndex = momoOrderId.indexOf("_v");
+                    if (vIndex > 0) {
+                        originalOrderId = momoOrderId.substring(0, vIndex);
+                        log.info("Extracted original orderId {} from versioned orderId {}", originalOrderId,
+                                momoOrderId);
+                    }
+                }
+            }
+
+            // Find payment in database using the original orderId
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(originalOrderId);
             if (!payments.isEmpty()) {
                 // Get the most recent payment
                 Payment payment = payments.get(0);
+
+                // Make sure it's a MOMO payment
+                if (payment.getPaymentMethod() != PaymentMethod.MOMO) {
+                    List<Payment> momoPayments = payments.stream()
+                            .filter(p -> p.getPaymentMethod() == PaymentMethod.MOMO)
+                            .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
+                            .toList();
+
+                    if (!momoPayments.isEmpty()) {
+                        payment = momoPayments.get(0);
+                    }
+                }
 
                 // Update status
                 if ("0".equals(errorCode)) {
@@ -79,9 +117,9 @@ public class MomoController {
                 payment.setUpdatedAt(LocalDateTime.now());
                 paymentRepository.save(payment);
 
-                log.info("Updated payment status to {} for orderId: {}", payment.getStatus(), orderId);
+                log.info("Updated payment status to {} for orderId: {}", payment.getStatus(), originalOrderId);
             } else {
-                log.warn("Payment not found for orderId: {}", orderId);
+                log.warn("Payment not found for orderId: {}", originalOrderId);
             }
 
             return ResponseEntity.ok("OK");
@@ -115,8 +153,19 @@ public class MomoController {
             return ResponseEntity.notFound().build();
         }
 
-        // Get the most recent payment
-        Payment payment = payments.get(0);
+        // Find MOMO payment
+        Payment payment = null;
+        for (Payment p : payments) {
+            if (p.getPaymentMethod() == PaymentMethod.MOMO) {
+                payment = p;
+                break;
+            }
+        }
+
+        if (payment == null) {
+            log.warn("No MOMO payment found for orderId: {}", orderId);
+            return ResponseEntity.notFound().build();
+        }
 
         // If payment is still PENDING and we have a resultCode, update status
         if (payment.getStatus() == PaymentStatus.PENDING && resultCode != null) {

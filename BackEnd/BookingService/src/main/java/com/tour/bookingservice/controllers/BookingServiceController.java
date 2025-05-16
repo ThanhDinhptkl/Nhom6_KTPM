@@ -103,11 +103,14 @@ public class BookingServiceController {
 	@PostMapping("/booking/payment/webhook")
 	public ResponseEntity<BookingServiceDTO> updateBookingAfterPayment(
 			@RequestParam("bookingId") int bookingId,
-			@RequestParam("paymentStatus") String paymentStatus) {
+			@RequestParam("paymentStatus") String paymentStatus,
+			@RequestParam(value = "paymentMethod", required = false) String paymentMethod) {
 
-		log.info("Webhook called for booking ID: {}, payment status: {}", bookingId, paymentStatus);
+		log.info("Webhook called for booking ID: {}, payment status: {}, payment method: {}",
+				bookingId, paymentStatus, paymentMethod);
 
-		BookingServiceDTO updatedBooking = bookingService.updateBookingAfterPayment(bookingId, paymentStatus);
+		BookingServiceDTO updatedBooking = bookingService.updateBookingAfterPayment(
+				bookingId, paymentStatus, paymentMethod);
 
 		if (updatedBooking == null) {
 			log.error("Failed to update booking: {}, not found", bookingId);

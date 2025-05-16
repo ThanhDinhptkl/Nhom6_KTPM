@@ -49,7 +49,8 @@ public interface BookingService {
 	 * 
 	 * @param bookingId     Booking ID
 	 * @param paymentStatus Payment status (COMPLETED, FAILED)
+	 * @param paymentMethod Payment method
 	 * @return Updated booking details
 	 */
-	BookingServiceDTO updateBookingAfterPayment(int bookingId, String paymentStatus);
+	BookingServiceDTO updateBookingAfterPayment(int bookingId, String paymentStatus, String paymentMethod);
 }

@@ -64,11 +64,17 @@ public class PaymentServiceClient {
     /**
      * Get payment status for a booking
      * 
-     * @param bookingId The booking ID
+     * @param bookingId     The booking ID
+     * @param paymentMethod Optional - specific payment method to check
      * @return Payment status information
      */
-    public Map<String, Object> getPaymentStatus(int bookingId) {
+    public Map<String, Object> getPaymentStatus(int bookingId, String paymentMethod) {
         String url = paymentServiceUrl + "/api/payments/" + bookingId;
+
+        // If payment method is specified, add it as a query parameter
+        if (paymentMethod != null && !paymentMethod.isEmpty()) {
+            url += "?paymentMethod=" + paymentMethod;
+        }
 
         try {
             return restTemplate.getForObject(url, Map.class);
@@ -82,5 +88,15 @@ public class PaymentServiceClient {
             errorResponse.put("message", "Failed to get payment status: " + e.getMessage());
             return errorResponse;
         }
+    }
+
+    /**
+     * Get payment status for a booking (all payment methods)
+     * 
+     * @param bookingId The booking ID
+     * @return Payment status information
+     */
+    public Map<String, Object> getPaymentStatus(int bookingId) {
+        return getPaymentStatus(bookingId, null);
     }
 }
