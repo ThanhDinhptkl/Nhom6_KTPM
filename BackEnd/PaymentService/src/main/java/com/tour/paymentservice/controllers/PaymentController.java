@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.modelmapper.ModelMapper;
 
@@ -46,7 +47,8 @@ public class PaymentController {
     private String serverBaseUrl;
 
     @PostMapping
-    public ResponseEntity<PaymentResponseDto> createPayment(@RequestBody PaymentRequestDto requestDto) {
+    public CompletableFuture<ResponseEntity<PaymentResponseDto>> createPayment(
+            @RequestBody PaymentRequestDto requestDto) {
         log.info("Creating payment with method: {}, orderId: {}", requestDto.getPaymentMethod(),
                 requestDto.getOrderId());
 
@@ -67,8 +69,8 @@ public class PaymentController {
             log.error("Error encoding URL", e);
         }
 
-        PaymentResponseDto response = paymentService.createPayment(requestDto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return paymentService.createPayment(requestDto)
+                .thenApply(response -> ResponseEntity.status(HttpStatus.CREATED).body(response));
     }
 
     @GetMapping("/{orderId}")
@@ -145,7 +147,8 @@ public class PaymentController {
     }
 
     @GetMapping("/test/momo")
-    public ResponseEntity<PaymentResponseDto> testMomoPayment(@RequestParam(defaultValue = "10000") BigDecimal amount) {
+    public CompletableFuture<ResponseEntity<PaymentResponseDto>> testMomoPayment(
+            @RequestParam(defaultValue = "10000") BigDecimal amount) {
         log.info("Testing MoMo payment with amount: {}", amount);
 
         // Create a test payment request
@@ -158,8 +161,8 @@ public class PaymentController {
                 .paymentMethod(PaymentMethod.MOMO)
                 .build();
 
-        PaymentResponseDto response = paymentService.createPayment(requestDto);
-        return ResponseEntity.ok(response);
+        return paymentService.createPayment(requestDto)
+                .thenApply(response -> ResponseEntity.ok(response));
     }
 
     /**
