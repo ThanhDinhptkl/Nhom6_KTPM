@@ -1,0 +1,42 @@
+resilience4j:
+  ratelimiter:
+    instances:
+      createPayment:
+        limitForPeriod: 5
+        limitRefreshPeriod: 60s
+        timeoutDuration: 100ms
+  retry:
+    instances:
+      momoPayment:
+        maxAttempts: 3
+        waitDuration: 5s
+        enableExponentialBackoff: false
+        retryExceptions:
+          - java.io.IOException
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+      vnpayPayment:
+        maxAttempts: 3
+        waitDuration: 5s
+        enableExponentialBackoff: false
+        retryExceptions:
+          - java.io.IOException
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+  timelimiter:
+    instances:
+      createPayment:
+        timeoutDuration: 10s
+        cancelRunningFuture: true
+      momoPayment:
+        timeoutDuration: 5s
+        cancelRunningFuture: true
+      vnpayPayment:
+        timeoutDuration: 5s
+        cancelRunningFuture: true 
+
+spring:
+  main:
+    allow-bean-definition-overriding: true 

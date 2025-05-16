@@ -26,6 +26,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+import org.modelmapper.ModelMapper;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -38,12 +41,14 @@ public class PaymentController {
     private final VnPayService vnPayService;
     private final MomoPaymentService momoPaymentService;
     private final PaymentRepository paymentRepository;
+    private final ModelMapper modelMapper;
 
     @Value("${app.server.base-url}")
     private String serverBaseUrl;
 
     @PostMapping
-    public ResponseEntity<PaymentResponseDto> createPayment(@RequestBody PaymentRequestDto requestDto) {
+    public CompletableFuture<ResponseEntity<PaymentResponseDto>> createPayment(
+            @RequestBody PaymentRequestDto requestDto) {
         log.info("Creating payment with method: {}, orderId: {}", requestDto.getPaymentMethod(),
                 requestDto.getOrderId());
 
@@ -64,20 +69,45 @@ public class PaymentController {
             log.error("Error encoding URL", e);
         }
 
-        PaymentResponseDto response = paymentService.createPayment(requestDto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return paymentService.createPayment(requestDto)
+                .thenApply(response -> ResponseEntity.status(HttpStatus.CREATED).body(response));
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<PaymentResponseDto> getPaymentStatus(@PathVariable String orderId) {
-        log.info("Getting payment status for order: {}", orderId);
+    public ResponseEntity<PaymentResponseDto> getPaymentStatus(
+            @PathVariable String orderId,
+            @RequestParam(value = "paymentMethod", required = false) PaymentMethod paymentMethod) {
 
-        PaymentResponseDto response = paymentService.getPaymentByOrderId(orderId);
-        if (response == null) {
+        log.info("Getting payment status for order: {}, paymentMethod: {}", orderId, paymentMethod);
+
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+        if (payments.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(response);
+        Payment payment = null;
+
+        if (paymentMethod != null) {
+            // Filter for specific payment method
+            for (Payment p : payments) {
+                if (p.getPaymentMethod() == paymentMethod) {
+                    payment = p;
+                    break;
+                }
+            }
+
+            if (payment == null) {
+                log.warn("No payment found with method {} for orderID: {}", paymentMethod, orderId);
+                return ResponseEntity.notFound().build();
+            }
+        } else {
+            // Default to most recent payment if no method specified
+            payment = payments.get(0);
+        }
+
+        // Map to response DTO
+        PaymentResponseDto responseDto = modelMapper.map(payment, PaymentResponseDto.class);
+        return ResponseEntity.ok(responseDto);
     }
 
     @GetMapping("/vnpay/callback")
@@ -117,7 +147,8 @@ public class PaymentController {
     }
 
     @GetMapping("/test/momo")
-    public ResponseEntity<PaymentResponseDto> testMomoPayment(@RequestParam(defaultValue = "10000") BigDecimal amount) {
+    public CompletableFuture<ResponseEntity<PaymentResponseDto>> testMomoPayment(
+            @RequestParam(defaultValue = "10000") BigDecimal amount) {
         log.info("Testing MoMo payment with amount: {}", amount);
 
         // Create a test payment request
@@ -130,8 +161,8 @@ public class PaymentController {
                 .paymentMethod(PaymentMethod.MOMO)
                 .build();
 
-        PaymentResponseDto response = paymentService.createPayment(requestDto);
-        return ResponseEntity.ok(response);
+        return paymentService.createPayment(requestDto)
+                .thenApply(response -> ResponseEntity.ok(response));
     }
 
     /**
@@ -175,23 +206,59 @@ public class PaymentController {
     public RedirectView processMomoReturn(@RequestParam Map<String, String> returnParams) {
         log.info("Momo return URL accessed with params: {}", returnParams);
 
-        String orderId = returnParams.get("orderId");
+        String momoOrderId = returnParams.get("orderId");
         String errorCode = returnParams.get("errorCode");
+        String extraData = returnParams.get("extraData");
 
-        log.info("Processing Momo return for orderId={}, errorCode={}", orderId, errorCode);
+        log.info("Processing Momo return for momoOrderId={}, errorCode={}", momoOrderId, errorCode);
 
-        if (orderId == null) {
+        if (momoOrderId == null) {
             return new RedirectView("/payment-result.html?status=failure&message=Không+tìm+thấy+mã+đơn+hàng");
         }
 
-        // Find payment in database
-        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+        // Extract original orderId if this is a versioned orderId
+        String originalOrderId = momoOrderId;
+        if (momoOrderId.contains("_v")) {
+            // Try to extract from extraData first
+            if (extraData != null && extraData.contains("originalOrderId=")) {
+                String[] parts = extraData.split("originalOrderId=");
+                if (parts.length > 1) {
+                    String part = parts[1];
+                    int commaIndex = part.indexOf(",");
+                    originalOrderId = commaIndex > 0 ? part.substring(0, commaIndex) : part;
+                    log.info("Extracted original orderId {} from versioned orderId {}", originalOrderId, momoOrderId);
+                }
+            } else {
+                // If not available in extraData, try to parse it from the orderId
+                int vIndex = momoOrderId.indexOf("_v");
+                if (vIndex > 0) {
+                    originalOrderId = momoOrderId.substring(0, vIndex);
+                    log.info("Extracted original orderId {} from versioned orderId {}", originalOrderId, momoOrderId);
+                }
+            }
+        }
+
+        // Update the orderId parameter for client redirect to use the original order ID
+        returnParams.put("orderId", originalOrderId);
+
+        // Find payment in database using the original orderId
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(originalOrderId);
         if (payments.isEmpty()) {
             return new RedirectView("/payment-result.html?status=failure&message=Không+tìm+thấy+thông+tin+thanh+toán");
         }
 
-        // Get the most recent payment
+        // Get the most recent payment - make sure it's a MOMO payment
         Payment payment = payments.get(0);
+        if (payment.getPaymentMethod() != PaymentMethod.MOMO) {
+            List<Payment> momoPayments = payments.stream()
+                    .filter(p -> p.getPaymentMethod() == PaymentMethod.MOMO)
+                    .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
+                    .toList();
+
+            if (!momoPayments.isEmpty()) {
+                payment = momoPayments.get(0);
+            }
+        }
 
         // Update payment status if not already updated
         if (payment.getStatus() == PaymentStatus.PENDING && errorCode != null) {
@@ -203,13 +270,14 @@ public class PaymentController {
 
             // Use paymentService to update status and notify booking service
             PaymentResponseDto updatedPayment = paymentService.updatePaymentStatus(
-                    orderId,
+                    originalOrderId,
                     newStatus,
                     transId != null ? transId : payment.getTransactionId(),
                     errorCode,
-                    isSuccess ? "Payment completed" : "Payment failed");
+                    isSuccess ? "Payment completed" : "Payment failed",
+                    PaymentMethod.MOMO);
 
-            log.info("Updated payment status to {} for orderId: {}", newStatus, orderId);
+            log.info("Updated payment status to {} for orderId: {}", newStatus, originalOrderId);
         }
 
         // Build redirect URL with payment information
@@ -230,30 +298,68 @@ public class PaymentController {
      */
     @PostMapping("/momo/ipn")
     @ResponseBody
-    public String processMomoIpn(@RequestBody Map<String, Object> ipnData) {
+    public String processMomoIPN(@RequestBody Map<String, Object> ipnData) {
         log.info("Received MoMo IPN webhook: {}", ipnData);
 
         // Get orderId and resultCode from IPN data
-        String orderId = (String) ipnData.get("orderId");
+        String momoOrderId = (String) ipnData.get("orderId");
         Object resultCodeObj = ipnData.get("resultCode");
         String resultCode = (resultCodeObj != null) ? String.valueOf(resultCodeObj) : "ERROR";
+        String extraData = (String) ipnData.get("extraData");
 
-        if (orderId == null) {
+        if (momoOrderId == null) {
             log.error("MoMo IPN missing orderId");
             return "FAIL";
         }
 
-        log.info("Processing MoMo IPN for orderId={}, resultCode={}", orderId, resultCode);
+        log.info("Processing MoMo IPN for momoOrderId={}, resultCode={}", momoOrderId, resultCode);
+
+        // Extract original orderId if this is a versioned orderId
+        String originalOrderId = momoOrderId;
+        if (momoOrderId.contains("_v")) {
+            // Try to extract from extraData first
+            if (extraData != null && extraData.contains("originalOrderId=")) {
+                String[] parts = extraData.split("originalOrderId=");
+                if (parts.length > 1) {
+                    String part = parts[1];
+                    int commaIndex = part.indexOf(",");
+                    originalOrderId = commaIndex > 0 ? part.substring(0, commaIndex) : part;
+                    log.info("Extracted original orderId {} from versioned orderId {}", originalOrderId, momoOrderId);
+                }
+            } else {
+                // If not available in extraData, try to parse it from the orderId
+                int vIndex = momoOrderId.indexOf("_v");
+                if (vIndex > 0) {
+                    originalOrderId = momoOrderId.substring(0, vIndex);
+                    log.info("Extracted original orderId {} from versioned orderId {}", originalOrderId, momoOrderId);
+                }
+            }
+        }
 
         try {
             // Find payment by orderId
-            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtDesc(originalOrderId);
             if (payments.isEmpty()) {
-                log.error("Payment not found for orderId: {}", orderId);
+                log.error("Payment not found for orderId: {}", originalOrderId);
                 return "FAIL";
             }
 
             Payment payment = payments.get(0);
+
+            // Make sure it's a MOMO payment
+            if (payment.getPaymentMethod() != PaymentMethod.MOMO) {
+                List<Payment> momoPayments = payments.stream()
+                        .filter(p -> p.getPaymentMethod() == PaymentMethod.MOMO)
+                        .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
+                        .toList();
+
+                if (!momoPayments.isEmpty()) {
+                    payment = momoPayments.get(0);
+                } else {
+                    log.error("No MOMO payment found for orderId: {}", originalOrderId);
+                    return "FAIL";
+                }
+            }
 
             // Only update if payment is still PENDING
             if (payment.getStatus() == PaymentStatus.PENDING) {
@@ -269,11 +375,12 @@ public class PaymentController {
 
                 // Update payment status
                 PaymentResponseDto result = paymentService.updatePaymentStatus(
-                        orderId,
+                        originalOrderId,
                         newStatus,
                         transId != null ? transId : payment.getTransactionId(),
                         resultCode,
-                        (String) ipnData.get("message"));
+                        (String) ipnData.get("message"),
+                        PaymentMethod.MOMO);
 
                 log.info("Successfully updated payment status from MoMo IPN: {}", newStatus);
             } else {
