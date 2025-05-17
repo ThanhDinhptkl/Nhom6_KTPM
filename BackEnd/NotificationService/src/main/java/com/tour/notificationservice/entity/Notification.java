@@ -34,6 +34,9 @@ public class Notification {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Column
+    private Integer tourId; // Thêm trường tourId để lưu ID của tour
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
