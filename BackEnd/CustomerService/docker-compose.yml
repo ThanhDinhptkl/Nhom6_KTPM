@@ -28,7 +28,7 @@ services:
     networks:
       - customer-network
     healthcheck:
-      test: mysqladmin ping -h localhost -u root -p${SPRING_DATASOURCE_PASSWORD}
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${SPRING_DATASOURCE_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,4 +40,6 @@ networks:
     driver: bridge
 
 volumes:
-  mysql_data: 
+  mysql_data:
+    external: true
+    name: customerservice_mysql_data

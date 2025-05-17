@@ -15,7 +15,7 @@ spring:
         - DedupeResponseHeader=Access-Control-Allow-Origin
       routes:
         - id: customer-service
-          uri: lb://CUSTOMERSERVICE
+          uri: http://customer.phamhuuthuan.io.vn:8081
           predicates:
             - Path=/customer/**
           filters:
@@ -24,7 +24,7 @@ spring:
             - AddRequestHeader=X-Forwarded-Prefix, /customer
 
         - id: oauth-service
-          uri: lb://CUSTOMERSERVICE
+          uri: http://customer.phamhuuthuan.io.vn:8081
           predicates:
             - Path=/oauth2/**
           filters:
@@ -33,7 +33,7 @@ spring:
             - AddRequestHeader=X-Forwarded-Prefix, /oauth2
 
         - id: oauth2-callback
-          uri: lb://CUSTOMERSERVICE
+          uri: http://customer.phamhuuthuan.io.vn:8081
           predicates:
             - Path=/login/oauth2/code/**
           filters:
