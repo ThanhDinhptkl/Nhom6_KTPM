@@ -106,6 +106,7 @@ public class SecurityConfig {
                                 "/api/rate-limit/status",
                                 "/api/circuit-breaker/**", "/actuator/**")
                         .permitAll() // Cho phep truy cap cong khai
+                        .requestMatchers(HttpMethod.GET, "/customer/{id}").permitAll() 
                         .requestMatchers("/customer/email/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/phone/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER

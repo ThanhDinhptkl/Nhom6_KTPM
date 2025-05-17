@@ -18,4 +18,5 @@ public interface CustomerService extends UserDetailsService {
     void changePassword(String token, String oldPassword, String newPassword); // Đổi mật khẩu
     Customer saveCustomer(Customer customer);
     public Map<String, String> generateTokens(UserDetails userDetails);
+    Customer findById(Integer id); 
 }

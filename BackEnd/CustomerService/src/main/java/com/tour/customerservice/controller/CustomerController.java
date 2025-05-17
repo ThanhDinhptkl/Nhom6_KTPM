@@ -110,6 +110,14 @@ public class CustomerController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
         }
     }
+    @GetMapping("/{id}")
+    public ResponseEntity<CustomerResponseDTO> getCustomerById(@PathVariable Integer id) {
+        Customer customer = customerService.findById(id);
+        if (customer == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(toDTO(customer));
+    }
 
     // @GetMapping("/customer/dashboard")
     // @PreAuthorize("hasRole('CUSTOMER')")
