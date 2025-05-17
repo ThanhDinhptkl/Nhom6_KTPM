@@ -19,5 +19,17 @@ COPY --from=build /app/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
+# Application Configuration
+ENV SPRING_APPLICATION_NAME=api-gateway
+ENV SERVER_PORT=8080
+
+# Eureka Client Configuration
+ENV EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://14.225.212.208:8761/eureka/
+ENV EUREKA_CLIENT_ENABLED=true
+ENV EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+
+# Create directory for logs
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

@@ -19,5 +19,16 @@ COPY --from=build /app/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
+# Eureka Server Configuration
+ENV SPRING_APPLICATION_NAME=discovery-server
+ENV SERVER_PORT=8761
+ENV EUREKA_INSTANCE_HOSTNAME=discovery-server
+ENV EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+ENV EUREKA_CLIENT_FETCH_REGISTRY=false
+ENV EUREKA_SERVER_ENABLE_SELF_PRESERVATION=true
+
+# Create directory for logs
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
 EXPOSE 8761
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 
