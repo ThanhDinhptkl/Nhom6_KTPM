@@ -166,5 +166,10 @@ public class CustomerServiceImpl implements CustomerService {
             return tokens;
         });
     }
+    @Override
+    public Customer findById(Integer id) {
+        return databaseService.executeWithRetry(() -> customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id)));
+    }
 
 }
