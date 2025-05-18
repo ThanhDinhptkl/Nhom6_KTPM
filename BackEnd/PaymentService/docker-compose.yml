@@ -29,6 +29,7 @@ services:
 
   payment-db:
     image: mariadb:10.11
+    container_name: payment-db
     environment:
       - MYSQL_ROOT_PASSWORD=root
       - MYSQL_DATABASE=payment_service

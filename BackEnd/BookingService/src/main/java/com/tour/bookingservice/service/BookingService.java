@@ -29,6 +29,14 @@ public interface BookingService {
 	TourDTO getTourDetails(int tourId);
 
 	/**
+	 * Get all bookings for a specific user
+	 * 
+	 * @param userId User ID
+	 * @return List of bookings for the user
+	 */
+	List<BookingServiceDTO> getBookingsByUserId(int userId);
+
+	/**
 	 * Initiate payment for a booking
 	 * 
 	 * @param paymentRequest Payment request details

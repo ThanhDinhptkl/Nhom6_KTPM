@@ -70,7 +70,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource defaultCorsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token"));
         configuration.setAllowCredentials(true);
@@ -92,7 +92,7 @@ public class SecurityConfig {
                     }
                     // Otherwise use the default CORS configuration
                     CorsConfiguration configuration = new CorsConfiguration();
-                    configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+                    configuration.setAllowedOrigins(Arrays.asList("*"));
                     configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token"));
                     configuration.setAllowCredentials(true);
@@ -106,6 +106,7 @@ public class SecurityConfig {
                                 "/api/rate-limit/status",
                                 "/api/circuit-breaker/**", "/actuator/**")
                         .permitAll() // Cho phep truy cap cong khai
+                        .requestMatchers(HttpMethod.GET, "/customer/{id}").permitAll()
                         .requestMatchers("/customer/email/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/phone/**").hasAnyRole("ADMIN") // Phân quyền cho ADMIN
                         .requestMatchers("/customer/update").hasAnyRole("CUSTOMER", "ADMIN") // Phân quyền cho CUSTOMER

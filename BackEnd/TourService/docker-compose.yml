@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  tour-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tour-service:latest
+    container_name: tour-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      tour-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://14.225.212.208:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=14.225.215.93
+      - EUREKA_CLIENT_ENABLED=true
+      - SPRING_DATASOURCE_URL=jdbc:mysql://tour-db:3306/tour_db?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SERVER_PORT=8083
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  tour-db:
+    image: mysql:8.0
+    container_name: tour-db
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=tour_db
+    volumes:
+      - tour-mysql-data:/var/lib/mysql
+    networks:
+      - microservices-network
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  microservices-network:
+    driver: bridge
+
+volumes:
+  tour-mysql-data: 

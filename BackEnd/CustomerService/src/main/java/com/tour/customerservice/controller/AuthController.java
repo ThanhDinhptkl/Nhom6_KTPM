@@ -131,7 +131,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> registerCustomer(@RequestBody Customer customer) {
         try {
-            Customer registeredCustomer = circuitBreakerService.registerCustomer(customer);
+            Customer registeredCustomer = customerService.registerCustomer(customer);
 
             // Chuyển sang DTO để trả về
             CustomerResponseDTO responseDTO = new CustomerResponseDTO();

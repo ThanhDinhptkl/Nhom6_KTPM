@@ -49,24 +49,21 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             "GET:/customer/auth/.*",
             "/oauth2/.*");
 
-    private static final Map<String, Set<String>> ROUTE_ROLES = Map.of(
-            "POST:/tour", Set.of("ROLE_ADMIN"),
-            "POST:/tours", Set.of("ROLE_ADMIN"),
-            "PUT:/tour", Set.of("ROLE_ADMIN"),
-            "DELETE:/tour/delete/\\d+", Set.of("ROLE_ADMIN"),
+    private static final Map<String, Set<String>> ROUTE_ROLES = Map.ofEntries(
+            Map.entry("POST:/tour", Set.of("ROLE_ADMIN")),
+            Map.entry("POST:/tours", Set.of("ROLE_ADMIN")),
+            Map.entry("PUT:/tour", Set.of("ROLE_ADMIN")),
+            Map.entry("DELETE:/tour/delete/\\d+", Set.of("ROLE_ADMIN")),
 
-            // CUSTOMER và ADMIN có thể đặt, update booking
-            "POST:/booking", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN"),
-            "PUT:/booking", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN"),
+            Map.entry("POST:/booking", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")),
+            Map.entry("PUT:/booking", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")),
 
-            // CUSTOMER, ADMIN có thể xem lịch sử booking của mình
-            "GET:/booking/\\d+", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN"),
+            Map.entry("GET:/booking/.*", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")),
+            Map.entry("GET:/bookings/user/.*", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")),
+            Map.entry("POST:/booking/.*", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")),
 
-            // ADMIN có thể xem tất cả booking
-            "GET:/bookings", Set.of("ROLE_ADMIN"),
-
-            // CUSTOMER, ADMIN có thể hủy booking của mình
-            "DELETE:/booking/\\d+", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN"));
+            Map.entry("GET:/bookings", Set.of("ROLE_ADMIN")),
+            Map.entry("DELETE:/booking/\\d+", Set.of("ROLE_CUSTOMER", "ROLE_ADMIN")));
 
     @Override
     public GatewayFilter apply(Config config) {

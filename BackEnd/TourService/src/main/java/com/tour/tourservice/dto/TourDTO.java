@@ -26,4 +26,6 @@ public class TourDTO {
 	private Date end_date;
 
 	private Date created_at;
+	
+	private String image;
 }

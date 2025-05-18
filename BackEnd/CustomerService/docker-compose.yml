@@ -8,6 +8,13 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/tour
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://14.225.212.208:8761/eureka/
+      - EUREKA_INSTANCE_HOSTNAME=14.225.212.208
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=14.225.212.208
+      - EUREKA_CLIENT_ENABLED=true
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     depends_on:
       - db
     networks:
@@ -16,6 +23,7 @@ services:
 
   db:
     image: mysql:8.0
+    container_name: customerservice-db-1
     env_file:
       - .env
     environment:
@@ -33,6 +41,19 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+  backup:
+    image: mysql:8.0
+    command: >
+      bash -c "
+      while true; do
+        mysqldump -h db -u root -p$${MYSQL_ROOT_PASSWORD} tour > /backups/tour_$$(date +%Y%m%d).sql
+        sleep 86400
+      done"
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - db
+
     restart: always
 
 networks:
