@@ -94,6 +94,15 @@ class BookingServiceImpl implements BookingService {
 	}
 
 	@Override
+	public List<BookingServiceDTO> getBookingsByUserId(int userId) {
+		List<BookingServiceDTO> bookingServiceDTOs = new ArrayList<>();
+		bookingrepository.findByUserId(userId).forEach((booking) -> {
+			bookingServiceDTOs.add(modelMapper.map(booking, BookingServiceDTO.class));
+		});
+		return bookingServiceDTOs;
+	}
+
+	@Override
 	public Map<String, Object> initiatePayment(PaymentRequestDTO paymentRequest) {
 		// Get booking details
 		Booking booking = bookingrepository.getById(paymentRequest.getBookingId());

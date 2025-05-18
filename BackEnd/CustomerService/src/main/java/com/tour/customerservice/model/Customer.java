@@ -37,7 +37,7 @@ public class Customer {
     @Column(name = "refresh_token", length = 512)
     private String refreshToken;
 
-    @Column(name = "phone", unique = true, length = 20)
+    @Column(name = "phone", length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)

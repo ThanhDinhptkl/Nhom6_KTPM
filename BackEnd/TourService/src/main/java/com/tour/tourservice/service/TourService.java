@@ -8,6 +8,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.tour.tourservice.dto.TourDTO;
 import com.tour.tourservice.model.Tour;
@@ -32,7 +33,8 @@ public interface TourService {
 	TourDTO getOne(int id);
 	
 	List<Tour> findByPriceRange(double minPrice, double maxPrice);
-
+	
+	String uploadTourImage(MultipartFile file);
 }
 
 @Transactional
@@ -44,6 +46,9 @@ class TourServiceImpl implements TourService {
 	
 	@Autowired
 	ModelMapper modelMapper;
+	
+	@Autowired
+	CloudinaryService cloudinaryService;
 	
 	
 	@Override
@@ -131,6 +136,11 @@ class TourServiceImpl implements TourService {
 	    return tourRepository.findByPriceBetween(minPrice, maxPrice).stream()
 	            .sorted((t1, t2) -> Double.compare(t1.getPrice(), t2.getPrice())) // Sắp xếp tăng dần
 	            .collect(Collectors.toList());
+	}
+
+	@Override
+	public String uploadTourImage(MultipartFile file) {
+		return cloudinaryService.uploadImage(file);
 	}
 
 }

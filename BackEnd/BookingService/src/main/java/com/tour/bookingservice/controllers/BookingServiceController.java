@@ -48,6 +48,16 @@ public class BookingServiceController {
 				.orElse(new ResponseEntity<BookingServiceDTO>(HttpStatus.NOT_FOUND));
 	}
 
+	/**
+	 * Get all bookings for a specific user
+	 */
+	@GetMapping("/bookings/user/{userId}")
+	public ResponseEntity<List<BookingServiceDTO>> getBookingsByUserId(@PathVariable("userId") int userId) {
+		log.info("Getting bookings for user ID: {}", userId);
+		List<BookingServiceDTO> bookings = bookingService.getBookingsByUserId(userId);
+		return ResponseEntity.ok(bookings);
+	}
+
 	@DeleteMapping("/booking/{id}")
 	public void delete(@PathVariable(name = "id") Integer id) {
 		bookingService.delete(id);
