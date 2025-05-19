@@ -11,4 +11,6 @@ public interface NotificationService {
     void markAllAsRead(Integer userId);
     long getUnreadCount(Integer userId);
     void deleteNotification(Long notificationId);
+    Notification createPaymentSuccessNotification(Integer userId, Integer tourId, Integer bookingId);
+    Notification createBookingSuccessNotification(Integer userId, Integer tourId, Integer bookingId);
 } 
