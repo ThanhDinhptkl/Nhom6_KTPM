@@ -18,6 +18,9 @@ public class Notification {
 
     @Column(nullable = false)
     private Integer userId;
+    
+    @Column(nullable = false)
+    private Integer tourId;
 
     @Column(nullable = false)
     private String title;

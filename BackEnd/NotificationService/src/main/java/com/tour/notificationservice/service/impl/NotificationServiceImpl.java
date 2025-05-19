@@ -34,7 +34,47 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             CustomerResponseDTO customer = customerClient.getCustomerById(notification.getUserId());
             if (customer != null && customer.getEmail() != null && !customer.getEmail().isEmpty()) {
-                emailService.sendSimpleMessage(customer.getEmail(), notification.getTitle(), notification.getMessage());
+                // Nếu là thông báo đặt tour và có tourId, lấy thêm thông tin tour
+                if ("BOOKING".equals(notification.getType()) && notification.getTourId() != null) {
+                    try {
+                        TourResponseDTO tour = tourClient.getTourById(notification.getTourId());
+                        if (tour != null) {
+                            // Tạo nội dung HTML với ảnh
+                            String detailedMessage = String.format(
+                                "<div style='margin-bottom: 20px;'>" +
+                                "<h3 style='color: #2c3e50;'>Bạn đã đặt tour '%s' thành công!</h3>" +
+                                "<div style='margin: 20px 0;'>" +
+                                "<img src='%s' alt='Tour Image' style='max-width: 100%%; height: auto; border-radius: 8px;'/>" +
+                                "</div>" +
+                                "<div style='background-color: #f8f9fa; padding: 15px; border-radius: 5px;'>" +
+                                "<h4 style='color: #2c3e50; margin-top: 0;'>Thông tin tour:</h4>" +
+                                "<ul style='list-style: none; padding: 0;'>" +
+                                "<li style='margin: 10px 0;'><strong>Địa điểm:</strong> %s</li>" +
+                                "<li style='margin: 10px 0;'><strong>Ngày bắt đầu:</strong> %s</li>" +
+                                "<li style='margin: 10px 0;'><strong>Ngày kết thúc:</strong> %s</li>" +
+                                "<li style='margin: 10px 0;'><strong>Thời gian:</strong> %d ngày</li>" +
+                                "<li style='margin: 10px 0;'><strong>Giá:</strong> %.2f VND</li>" +
+                                "<li style='margin: 10px 0;'><strong>Số người tối đa:</strong> %d</li>" +
+                                "</ul>" +
+                                "</div>" +
+                                "</div>",
+                                tour.getTitle(),
+                                tour.getImage() != null ? tour.getImage() : "https://via.placeholder.com/400x300?text=No+Image",
+                                tour.getLocation(),
+                                tour.getStart_date(),
+                                tour.getEnd_date(),
+                                tour.getDuration(),
+                                tour.getPrice(),
+                                tour.getMax_participants()
+                            );
+                            notification.setMessage(detailedMessage);
+                            saved = notificationRepository.save(notification);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Không thể lấy thông tin tour: " + e.getMessage());
+                    }
+                }
+                emailService.sendSimpleMessageBooking(customer.getEmail(), notification.getTitle(), notification.getMessage());
                 System.out.println("Đã gửi email tới: " + customer.getEmail());
             } else {
                 System.err.println("Không tìm thấy email cho userId: " + notification.getUserId());
@@ -82,6 +122,8 @@ public class NotificationServiceImpl implements NotificationService {
     public void deleteNotification(Long notificationId) {
         notificationRepository.deleteById(notificationId);
     }
+    
+    
 
     @Override
     @Transactional
@@ -107,37 +149,42 @@ public class NotificationServiceImpl implements NotificationService {
             notification.setUserId(userId);
             notification.setTitle("Thanh toán thành công");
             notification.setType("PAYMENT");
-            notification.setMessage(String.format(
-                "Kính gửi %s,\n\n" +
-                "Chúng tôi xin xác nhận rằng khoản thanh toán của bạn đã được xử lý thành công.\n\n" +
-                "Chi tiết đặt tour:\n" +
-                "- Mã đặt tour: %d\n" +
-                "- Tour: %s\n" +
-                "- Địa điểm: %s\n" +
-                "- Ngày khởi hành: %s\n" +
-                "- Ngày kết thúc: %s\n" +
-                "- Số người: %d\n" +
-                "- Tổng tiền: %.2f VND\n" +
-                "- Ngày đặt: %s\n\n" +
-                "Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất để cung cấp thêm thông tin chi tiết về tour.\n\n" +
-                "Trân trọng,\n" +
-                "Đội ngũ Tour Booking",
-                customer.getName(),
+            
+            // Tạo nội dung HTML với ảnh - sử dụng format ngắn gọn hơn
+            String detailedMessage = String.format(
+                "<h3 style='color:#2c3e50'>Thanh toán tour '%s' thành công!</h3>" +
+                "<img src='%s' alt='Tour' style='max-width:100%%;height:auto;border-radius:8px;margin:10px 0'/>" +
+                "<div style='background:#f8f9fa;padding:15px;border-radius:5px'>" +
+                "<h4 style='color:#2c3e50;margin:0 0 10px'>Thông tin thanh toán:</h4>" +
+                "<ul style='list-style:none;padding:0;margin:0'>" +
+                "<li style='margin:5px 0'><b>Mã tour:</b> %d</li>" +
+                "<li style='margin:5px 0'><b>Tour:</b> %s</li>" +
+                "<li style='margin:5px 0'><b>Địa điểm:</b> %s</li>" +
+                "<li style='margin:5px 0'><b>Ngày đi:</b> %s</li>" +
+                "<li style='margin:5px 0'><b>Số người:</b> %d</li>" +
+                "<li style='margin:5px 0'><b>Tổng tiền:</b> %.2f VND</li>" +
+                "</ul>" +
+                "</div>" +
+                "<div style='margin-top:15px;padding:10px;background:#e8f5e9;border-radius:5px'>" +
+                "<p style='margin:0;color:#2e7d32'>Chúng tôi sẽ liên hệ với bạn sớm nhất để cung cấp thêm thông tin.</p>" +
+                "</div>",
+                tour.getTitle(),
+                tour.getImage() != null ? tour.getImage() : "https://via.placeholder.com/400x300?text=No+Image",
                 booking.getId(),
                 tour.getTitle(),
                 tour.getLocation(),
                 dateFormat.format(tour.getStart_date()),
-                dateFormat.format(tour.getEnd_date()),
                 booking.getNumber_of_people(),
-                booking.getTotal_price(),
-                dateFormat.format(booking.getBooking_date())
-            ));
+                booking.getTotal_price()
+            );
+            
+            notification.setMessage(detailedMessage);
 
             // Lưu thông báo và gửi email
             Notification saved = notificationRepository.save(notification);
             try {
                 if (customer.getEmail() != null && !customer.getEmail().isEmpty()) {
-                    emailService.sendSimpleMessage(
+                    emailService.sendSimpleMessageBooking(
                         customer.getEmail(),
                         "Xác nhận thanh toán thành công - Tour " + tour.getTitle(),
                         notification.getMessage()
@@ -208,7 +255,7 @@ public class NotificationServiceImpl implements NotificationService {
             Notification saved = notificationRepository.save(notification);
             try {
                 if (customer.getEmail() != null && !customer.getEmail().isEmpty()) {
-                    emailService.sendSimpleMessage(
+                    emailService.sendSimpleMessageBooking(
                         customer.getEmail(),
                         "Xác nhận đặt tour thành công - Tour " + tour.getTitle(),
                         notification.getMessage()
