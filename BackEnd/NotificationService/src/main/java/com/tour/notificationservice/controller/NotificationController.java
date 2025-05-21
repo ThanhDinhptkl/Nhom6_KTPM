@@ -52,4 +52,20 @@ public class NotificationController {
         notificationService.deleteNotification(notificationId);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/payment-success")
+    public ResponseEntity<Notification> createPaymentSuccessNotification(
+            @RequestParam Integer userId,
+            @RequestParam Integer tourId,
+            @RequestParam Integer bookingId) {
+        return ResponseEntity.ok(notificationService.createPaymentSuccessNotification(userId, tourId, bookingId));
+    }
+
+    @PostMapping("/booking-success")
+    public ResponseEntity<Notification> createBookingSuccessNotification(
+            @RequestParam Integer userId,
+            @RequestParam Integer tourId,
+            @RequestParam Integer bookingId) {
+        return ResponseEntity.ok(notificationService.createBookingSuccessNotification(userId, tourId, bookingId));
+    }
 } 

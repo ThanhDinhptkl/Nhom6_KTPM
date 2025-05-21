@@ -1,0 +1,182 @@
+# Tài liệu PaymentService API
+
+## Giới thiệu
+PaymentService là dịch vụ quản lý thanh toán trong hệ thống Tour, hỗ trợ nhiều phương thức thanh toán trực tuyến như MOMO và VNPAY. Service này xử lý toàn bộ quy trình thanh toán, từ khởi tạo giao dịch, xử lý callback từ cổng thanh toán, đến cập nhật trạng thái đơn hàng.
+
+## Kiến trúc
+PaymentService được xây dựng trên Spring Boot, tích hợp với các cổng thanh toán phổ biến tại Việt Nam. Service cung cấp các API để:
+- Tạo yêu cầu thanh toán
+- Xử lý kết quả thanh toán từ các cổng thanh toán
+- Kiểm tra trạng thái thanh toán
+- Thông báo kết quả thanh toán đến các service khác trong hệ thống
+
+## API Endpoints
+
+### PaymentController (/api/payments)
+
+#### 1. Tạo thanh toán mới
+- **Endpoint**: POST `/api/payments`
+- **Mô tả**: Tạo một yêu cầu thanh toán mới
+- **Request Body**: 
+  ```json
+  {
+    "orderId": "ORDER123",
+    "amount": 100000,
+    "description": "Thanh toán đơn hàng #ORDER123",
+    "customerEmail": "customer@example.com",
+    "returnUrl": "https://example.com/return", 
+    "paymentMethod": "MOMO" // hoặc "VNPAY"
+  }
+  ```
+- **Response**: 
+  ```json
+  {
+    "orderId": "ORDER123",
+    "amount": 100000,
+    "transactionId": "TRANS123",
+    "paymentUrl": "https://payment-gateway.com/pay?token=xyz",
+    "status": "PENDING",
+    "paymentMethod": "MOMO",
+    "responseCode": null,
+    "responseMessage": null
+  }
+  ```
+
+#### 2. Kiểm tra trạng thái thanh toán
+- **Endpoint**: GET `/api/payments/{orderId}`
+- **Mô tả**: Lấy thông tin và trạng thái của một thanh toán
+- **Query Parameters**: `paymentMethod` (tùy chọn)
+- **Response**: Thông tin chi tiết về thanh toán
+
+#### 3. Xử lý callback từ VNPAY
+- **Endpoint**: GET `/api/payments/vnpay/callback`
+- **Mô tả**: Xử lý callback từ cổng thanh toán VNPAY
+- **Query Parameters**: Các tham số từ VNPAY
+- **Response**: Chuyển hướng đến trang kết quả thanh toán
+
+#### 4. Test thanh toán MOMO
+- **Endpoint**: GET `/api/payments/test/momo`
+- **Mô tả**: Tạo một thanh toán test với MOMO
+- **Query Parameters**: `amount` (tùy chọn, mặc định 10,000 VND)
+- **Response**: Thông tin thanh toán test
+
+#### 5. Chuyển hướng trang kết quả
+- **Endpoint**: GET `/api/payments/redirect`
+- **Mô tả**: Chuyển hướng người dùng đến trang kết quả thanh toán
+- **Query Parameters**: `orderId`, `paymentMethod` và các tham số khác
+- **Response**: Chuyển hướng đến trang kết quả
+
+### MomoController (/api/payments/momo)
+
+#### 1. Tạo thanh toán MOMO
+- **Endpoint**: POST `/api/payments/momo/create`
+- **Mô tả**: Tạo một yêu cầu thanh toán qua MOMO
+- **Request Body**: Thông tin thanh toán (giống như ở PaymentController)
+- **Response**: Thông tin thanh toán và URL thanh toán MOMO
+
+#### 2. Xử lý callback từ MOMO
+- **Endpoint**: POST `/api/payments/momo/callback`
+- **Mô tả**: Xử lý callback từ cổng thanh toán MOMO
+- **Request Body**: Dữ liệu callback từ MOMO
+- **Response**: Kết quả xử lý callback
+
+#### 3. Kiểm tra thanh toán MOMO
+- **Endpoint**: GET `/api/payments/momo/check-payment`
+- **Mô tả**: Kiểm tra trạng thái thanh toán MOMO
+- **Query Parameters**: `orderId`, `resultCode` (tùy chọn)
+- **Response**: Thông tin chi tiết về thanh toán
+
+#### 4. Xử lý kết quả redirect từ MOMO
+- **Endpoint**: GET `/api/payments/momo/return`
+- **Mô tả**: Xử lý khi người dùng được chuyển hướng từ MOMO về
+- **Query Parameters**: Tham số từ MOMO
+- **Response**: Chuyển hướng đến trang kết quả thanh toán
+
+#### 5. Xử lý IPN từ MOMO
+- **Endpoint**: POST `/api/payments/momo/ipn`
+- **Mô tả**: Xử lý thông báo thanh toán tức thì từ MOMO
+- **Request Body**: Dữ liệu IPN từ MOMO
+- **Response**: Kết quả xử lý IPN
+
+### PaymentResultController (/api/payments/result)
+
+#### 1. Kiểm tra kết quả thanh toán
+- **Endpoint**: GET `/api/payments/result/check`
+- **Mô tả**: Kiểm tra kết quả thanh toán từ các cổng thanh toán
+- **Query Parameters**: `orderId`, `paymentMethod` (tùy chọn)
+- **Response**: Thông tin chi tiết về kết quả thanh toán
+
+#### 2. Chuyển hướng đến trang kết quả
+- **Endpoint**: GET `/api/payments/result/redirect`
+- **Mô tả**: Chuyển hướng người dùng đến trang kết quả thanh toán
+- **Query Parameters**: `orderId`, `paymentMethod` và các tham số khác
+- **Response**: Chuyển hướng đến trang kết quả thanh toán
+
+### WebController
+
+#### 1. Hiển thị trang kết quả thanh toán
+- **Endpoint**: GET `/payment-result`
+- **Mô tả**: Hiển thị trang kết quả thanh toán
+- **Response**: Chuyển hướng đến trang payment-result.html
+
+#### 2. Trang chủ
+- **Endpoint**: GET `/`
+- **Mô tả**: Trang chủ của dịch vụ
+- **Response**: Chuyển hướng đến trang index.html
+
+#### 3. Test thanh toán thành công
+- **Endpoint**: GET `/test-success`
+- **Mô tả**: Hiển thị trang kết quả thanh toán thành công (test)
+- **Response**: Chuyển hướng đến trang kết quả với trạng thái thành công
+
+#### 4. Test thanh toán thất bại
+- **Endpoint**: GET `/test-failure`
+- **Mô tả**: Hiển thị trang kết quả thanh toán thất bại (test)
+- **Response**: Chuyển hướng đến trang kết quả với trạng thái thất bại
+
+## Quy trình thanh toán
+
+### 1. Quy trình thanh toán MOMO
+1. **Khởi tạo thanh toán**:
+   - Client gửi yêu cầu tạo thanh toán đến `/api/payments` hoặc `/api/payments/momo/create`
+   - Service tạo bản ghi thanh toán với trạng thái PENDING
+   - Service tạo liên kết thanh toán với MOMO và trả về URL thanh toán
+
+2. **Xử lý thanh toán**:
+   - Người dùng được chuyển hướng đến trang thanh toán MOMO
+   - Người dùng hoàn tất/hủy thanh toán trên MOMO
+   - MOMO chuyển hướng người dùng về URL return đã đăng ký
+   - MOMO gửi kết quả thanh toán qua IPN webhook
+
+3. **Xử lý kết quả**:
+   - Service xử lý callback/redirect từ MOMO qua `/api/payments/momo/return`
+   - Service xử lý IPN từ MOMO qua `/api/payments/momo/ipn`
+   - Service cập nhật trạng thái thanh toán (COMPLETED/FAILED)
+   - Người dùng được chuyển hướng đến trang kết quả thanh toán
+
+### 2. Quy trình thanh toán VNPAY
+1. **Khởi tạo thanh toán**:
+   - Client gửi yêu cầu tạo thanh toán đến `/api/payments`
+   - Service tạo bản ghi thanh toán với trạng thái PENDING
+   - Service tạo liên kết thanh toán với VNPAY và trả về URL thanh toán
+
+2. **Xử lý thanh toán**:
+   - Người dùng được chuyển hướng đến trang thanh toán VNPAY
+   - Người dùng hoàn tất/hủy thanh toán trên VNPAY
+   - VNPAY chuyển hướng người dùng về URL return đã đăng ký
+
+3. **Xử lý kết quả**:
+   - Service xử lý callback từ VNPAY qua `/api/payments/vnpay/callback`
+   - Service cập nhật trạng thái thanh toán (COMPLETED/FAILED)
+   - Người dùng được chuyển hướng đến trang kết quả thanh toán
+
+## Thông báo kết quả đến các Service khác
+Khi thanh toán hoàn tất hoặc thất bại, PaymentService sẽ thông báo kết quả đến các service liên quan (như BookingService) để cập nhật trạng thái đơn hàng tương ứng.
+
+## Xử lý lỗi và retry
+PaymentService có cơ chế xử lý lỗi khi:
+- Kết nối với cổng thanh toán bị gián đoạn
+- Callback/IPN không được nhận đầy đủ
+- Xảy ra lỗi trong quá trình xử lý thanh toán
+
+Người dùng có thể kiểm tra trạng thái thanh toán thông qua API kiểm tra, và service có cơ chế cập nhật trạng thái thanh toán khi nhận được thông tin từ nhiều nguồn khác nhau (callback, redirect, IPN). 

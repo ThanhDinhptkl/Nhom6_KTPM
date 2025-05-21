@@ -1,0 +1,38 @@
+---
+- name: Deploy Discovery Service
+  hosts: server
+  tasks:
+    - name: Create directory
+      file:
+        path: /opt/discovery-service
+        state: directory
+        mode: '0755'
+    
+    - name: Install Java and git
+      apt:
+        name:
+          - openjdk-17-jdk
+          - git
+          - maven
+        state: present
+        update_cache: yes
+    
+    - name: Clone repository
+      git:
+        repo: https://github.com/ThanhDinhptkl/Nhom6_KTPM.git
+        dest: /tmp/repo
+        version: main
+    
+    - name: Build JAR file
+      shell: cd /tmp/repo/BackEnd/discovery-server && mvn clean package -DskipTests
+    
+    - name: Copy JAR to destination
+      copy:
+        src: /tmp/repo/BackEnd/discovery-server/target/discovery-server-0.0.1-SNAPSHOT.jar
+        dest: /opt/discovery-service/discovery-server.jar
+        remote_src: yes
+    
+    - name: Start service
+      shell: nohup java -jar /opt/discovery-service/discovery-server.jar > /opt/discovery-service/app.log 2>&1 &
+      async: 1
+      poll: 0 

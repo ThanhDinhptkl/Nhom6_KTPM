@@ -33,5 +33,5 @@ build/
 .vscode/
 
 .env
-
-.yml
+/BackEnd/CustomerService/*.yml
+/BackEnd/PaymentService*.properties

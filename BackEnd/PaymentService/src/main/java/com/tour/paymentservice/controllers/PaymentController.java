@@ -281,7 +281,7 @@ public class PaymentController {
         }
 
         // Build redirect URL with payment information
-        StringBuilder url = new StringBuilder("/payment-result.html?");
+        StringBuilder url = new StringBuilder("/payment/callback?");
         boolean isSuccess = payment.getStatus() == PaymentStatus.COMPLETED;
         url.append("status=").append(isSuccess ? "success" : "failure");
         url.append("&transactionId=").append(payment.getTransactionId() != null ? payment.getTransactionId() : "");

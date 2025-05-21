@@ -1,0 +1,152 @@
+# Tài liệu CustomerService API
+
+## Giới thiệu
+CustomerService là dịch vụ quản lý người dùng trong hệ thống Tour, cung cấp các chức năng đăng ký, đăng nhập, xác thực và quản lý thông tin người dùng. Service này đảm bảo việc xác thực người dùng và quản lý quyền hạn trong toàn bộ hệ thống.
+
+## Kiến trúc
+CustomerService được xây dựng trên Spring Boot, sử dụng JWT để xác thực và quản lý session. Service cung cấp các API để:
+- Đăng ký và đăng nhập tài khoản
+- Hỗ trợ đăng nhập bằng Google OAuth2
+- Quản lý thông tin cá nhân của người dùng
+- Quản lý phân quyền theo các vai trò (CUSTOMER, ADMIN, GUIDE)
+
+## API Endpoints
+
+### AuthController (/customer/auth)
+
+#### 1. Đăng nhập
+- **Endpoint**: POST `/customer/auth/login`
+- **Mô tả**: Xác thực người dùng và cấp token
+- **Request Body**: 
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "password"
+  }
+  ```
+- **Response**: 
+  ```json
+  {
+    "accessToken": "jwt_token_string",
+    "refreshToken": "refresh_token_string"
+  }
+  ```
+- **Lưu ý**: Người dùng đăng ký bằng Google sẽ không thể đăng nhập bằng mật khẩu
+
+#### 2. Đăng ký tài khoản
+- **Endpoint**: POST `/customer/auth/register`
+- **Mô tả**: Đăng ký tài khoản mới
+- **Request Body**: 
+  ```json
+  {
+    "name": "User Name",
+    "email": "user@example.com",
+    "password": "password",
+    "phone": "0123456789"
+  }
+  ```
+- **Response**: Thông tin người dùng đã đăng ký
+
+#### 3. Đăng nhập bằng Google
+- **Endpoint**: GET `/customer/auth/login/google`
+- **Mô tả**: Xác thực người dùng qua Google OAuth2
+- **Response**: Token đăng nhập
+
+#### 4. Redirect OAuth2
+- **Endpoint**: GET `/customer/auth/oauth2-redirect`
+- **Mô tả**: Xử lý chuyển hướng sau khi xác thực OAuth2
+- **Response**: Chuyển hướng đến frontend với token
+
+#### 5. Làm mới token
+- **Endpoint**: POST `/customer/auth/refresh-token`
+- **Mô tả**: Cấp mới access token từ refresh token
+- **Request Body**: 
+  ```json
+  {
+    "refreshToken": "refresh_token_string"
+  }
+  ```
+- **Response**: Token mới
+
+### CustomerController (/customer)
+
+#### 1. Lấy thông tin người dùng theo email
+- **Endpoint**: GET `/customer/email/{email}`
+- **Mô tả**: Lấy thông tin người dùng theo email
+- **Response**: Thông tin người dùng
+
+#### 2. Lấy thông tin người dùng theo số điện thoại
+- **Endpoint**: GET `/customer/phone/{phone}`
+- **Mô tả**: Lấy thông tin người dùng theo số điện thoại
+- **Response**: Thông tin người dùng
+
+#### 3. Lấy thông tin người dùng theo ID
+- **Endpoint**: GET `/customer/{id}`
+- **Mô tả**: Lấy thông tin người dùng theo ID
+- **Response**: Thông tin người dùng
+
+#### 4. Cập nhật thông tin người dùng
+- **Endpoint**: PUT `/customer/update`
+- **Mô tả**: Cập nhật thông tin cá nhân người dùng
+- **Headers**: Authorization Bearer token
+- **Request Body**: Thông tin cần cập nhật
+- **Response**: Thông tin người dùng đã cập nhật
+
+#### 5. Thay đổi mật khẩu
+- **Endpoint**: POST `/customer/changepassword`
+- **Mô tả**: Thay đổi mật khẩu người dùng
+- **Headers**: Authorization Bearer token
+- **Request Body**:
+  ```json
+  {
+    "oldPassword": "old_password",
+    "newPassword": "new_password"
+  }
+  ```
+- **Response**: 204 No Content khi thành công
+
+#### 6. Xóa người dùng
+- **Endpoint**: DELETE `/customer/delete/{id}`
+- **Mô tả**: Xóa tài khoản người dùng theo ID
+- **Response**: 204 No Content khi thành công
+
+#### 7. Đặt lại mật khẩu
+- **Endpoint**: PUT `/customer/resetpassword/{id}`
+- **Mô tả**: Đặt lại mật khẩu cho người dùng
+- **Response**: 204 No Content khi thành công
+
+#### 8. Lấy danh sách người dùng
+- **Endpoint**: GET `/customer/customerlist`
+- **Mô tả**: Lấy danh sách tất cả người dùng
+- **Response**: Danh sách người dùng
+
+#### 9. Lấy thông tin cá nhân
+- **Endpoint**: GET `/customer/profile`
+- **Mô tả**: Lấy thông tin cá nhân của người dùng đang đăng nhập
+- **Headers**: Authorization Bearer token
+- **Response**: Thông tin người dùng
+
+## Cơ chế xác thực và bảo mật
+
+### JWT Token
+CustomerService sử dụng JWT (JSON Web Token) để xác thực người dùng:
+- **Access Token**: Thời hạn ngắn, dùng để xác thực các API request
+- **Refresh Token**: Thời hạn dài, dùng để lấy access token mới khi hết hạn
+
+### Circuit Breaker
+Service tích hợp Circuit Breaker để:
+- Xử lý lỗi và ngăn chặn cascading failure
+- Đảm bảo khả năng phục hồi khi có sự cố
+- Đảm bảo tính sẵn sàng cao của hệ thống
+
+### Rate Limiting
+Service áp dụng Rate Limiting để:
+- Hạn chế số lượng request trong một khoảng thời gian
+- Ngăn chặn tấn công DDoS
+- Điều tiết lưu lượng truy cập
+
+## Tích hợp OAuth2
+CustomerService tích hợp Google OAuth2 cho phép:
+- Đăng nhập bằng tài khoản Google
+- Tự động tạo tài khoản mới nếu người dùng Google chưa tồn tại
+- Quản lý riêng biệt tài khoản đăng ký thông thường và tài khoản Google 
