@@ -15,13 +15,13 @@ public class RateLimitService {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
-    @Value("${rate.limit.capacity:1000}")
+    @Value("${rate.limit.capacity:5}")
     private int capacity;
 
-    @Value("${rate.limit.refill-tokens:1000}")
+    @Value("${rate.limit.refill-tokens:5}")
     private int refillTokens;
 
-    @Value("${rate.limit.refill-duration:3600}")
+    @Value("${rate.limit.refill-duration:60}")
     private int refillDurationInSeconds;
 
     /**
