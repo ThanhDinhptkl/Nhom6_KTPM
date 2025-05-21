@@ -1,6 +1,5 @@
 package com.tour.tourservice;
 
-
 import org.modelmapper.ModelMapper;
 import org.modelmapper.config.Configuration;
 import org.modelmapper.convention.MatchingStrategies;
@@ -16,13 +15,14 @@ public class TourServiceApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(TourServiceApplication.class, args);
 	}
-	@Bean
-    public ModelMapper modelMapper() {
-	ModelMapper modelMapper = new ModelMapper();
-	modelMapper.getConfiguration().setFieldMatchingEnabled(true)
-		.setFieldAccessLevel(Configuration.AccessLevel.PRIVATE)
-		.setMatchingStrategy(MatchingStrategies.STRICT);
-	return modelMapper;
-    }
 
+	@Bean
+	public ModelMapper modelMapper() {
+		ModelMapper modelMapper = new ModelMapper();
+		modelMapper.getConfiguration()
+				.setFieldMatchingEnabled(true)
+				.setFieldAccessLevel(Configuration.AccessLevel.PRIVATE)
+				.setMatchingStrategy(MatchingStrategies.STRICT);
+		return modelMapper;
+	}
 }
