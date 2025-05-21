@@ -8,6 +8,7 @@ import com.tour.customerservice.service.CircuitBreakerService;
 import com.tour.customerservice.service.CustomerService;
 import com.tour.customerservice.util.JwtUtil;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -129,7 +130,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerCustomer(@RequestBody Customer customer) {
+    public ResponseEntity<?> registerCustomer(@Valid @RequestBody Customer customer) {
         try {
             Customer registeredCustomer = customerService.registerCustomer(customer);
 
