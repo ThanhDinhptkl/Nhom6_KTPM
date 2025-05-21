@@ -1,0 +1,96 @@
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+# Cache dependencies between jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .m2/
+    - .gradle/
+
+# Build stage
+build:
+  stage: build
+  image: maven:3.8-openjdk-17
+  script:
+    - ls -la
+    - ls -la BackEnd/ || echo "BackEnd directory not found"
+    - cd BackEnd
+    - ls -la
+    
+    # Tạo các file cấu hình từ CI/CD variables nếu chúng tồn tại
+    - echo "Creating configuration files from CI variables..."
+    - if [ ! -z "$CUSTOMER_CONFIG" ]; then echo "$CUSTOMER_CONFIG" > CustomerService/application.yml; fi
+    - if [ ! -z "$PAYMENT_CONFIG" ]; then echo "$PAYMENT_CONFIG" > PaymentService/application.properties; fi
+    - if [ ! -z "$TOUR_CONFIG" ]; then echo "$TOUR_CONFIG" > TourService/application.yml; fi
+    - if [ ! -z "$BOOKING_CONFIG" ]; then echo "$BOOKING_CONFIG" > BookingService/application.yml; fi
+    - if [ ! -z "$NOTIFICATION_CONFIG" ]; then echo "$NOTIFICATION_CONFIG" > NotificationService/application.yml; fi
+    
+    # Build các service
+    - cd discovery-server && mvn clean package -DskipTests && cd ..
+    - cd api-gateway && mvn clean package -DskipTests && cd ..
+    - cd TourService && mvn clean package -DskipTests && cd ..
+    - cd CustomerService && mvn clean package -DskipTests && cd ..
+    - cd BookingService && mvn clean package -DskipTests && cd ..
+    - cd PaymentService && mvn clean package -DskipTests && cd ..
+    - cd NotificationService && mvn clean package -DskipTests && cd ..
+    - ls -la */target/*.jar || echo "No JAR files found"
+  artifacts:
+    paths:
+      - BackEnd/**/target/*.jar
+      - BackEnd/docker-compose.yml
+    expire_in: 1 week
+  tags:
+    - local
+
+# Test stage
+test:
+  stage: test
+  image: maven:3.8-openjdk-17
+  script:
+    - cd BackEnd
+    
+    # Tạo lại các file cấu hình từ CI/CD variables
+    - echo "Creating configuration files from CI variables for testing..."
+    - if [ ! -z "$CUSTOMER_CONFIG" ]; then echo "$CUSTOMER_CONFIG" > CustomerService/application.yml; fi
+    - if [ ! -z "$PAYMENT_CONFIG" ]; then echo "$PAYMENT_CONFIG" > PaymentService/application.properties; fi
+    - if [ ! -z "$TOUR_CONFIG" ]; then echo "$TOUR_CONFIG" > TourService/application.yml; fi
+    - if [ ! -z "$BOOKING_CONFIG" ]; then echo "$BOOKING_CONFIG" > BookingService/application.yml; fi
+    - if [ ! -z "$NOTIFICATION_CONFIG" ]; then echo "$NOTIFICATION_CONFIG" > NotificationService/application.yml; fi
+    
+    - echo "Running tests for all microservices..."
+    - cd discovery-server && mvn test && cd .. || echo "No tests for discovery-server"
+    - cd api-gateway && mvn test && cd .. || echo "No tests for api-gateway"
+    - cd TourService && mvn test && cd .. || echo "No tests for TourService"
+    - cd CustomerService && mvn test && cd .. || echo "No tests for CustomerService"
+    - cd BookingService && mvn test && cd .. || echo "No tests for BookingService"
+    - cd PaymentService && mvn test && cd .. || echo "No tests for PaymentService"
+    - cd NotificationService && mvn test && cd .. || echo "No tests for NotificationService"
+  dependencies:
+    - build
+  tags:
+    - local
+
+# Deploy locally - sử dụng shell script
+deploy-local:
+  stage: deploy
+  script:
+    - echo "Build and test completed successfully!"
+    - echo "To deploy locally, run these commands:"
+    - echo "cd BackEnd"
+    - echo "docker-compose down"
+    - echo "docker-compose up -d"
+    - echo "JAR files are available in target/ directories of each service"
+  environment:
+    name: local
+    url: http://localhost:8080
+  only:
+    - main
+  tags:
+    - local

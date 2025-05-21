@@ -1,0 +1,16 @@
+docker run --rm -it -v ${PWD}:/ansible -v C:/Users/ACER/.ssh:/root/.ssh -w /ansible cytopia/ansible:latest-tools bash
+
+chmod 600 /root/.ssh/id_rsa
+
+chmod 644 /root/.ssh/id_rsa.pub
+
+ansible-playbook -i hosts deploy.yml
+
+
+
+
+STOP
+
+pkill -f "java -jar /opt/discovery-service/discovery-server.jar"
+
+rm -rf discovery-service/
