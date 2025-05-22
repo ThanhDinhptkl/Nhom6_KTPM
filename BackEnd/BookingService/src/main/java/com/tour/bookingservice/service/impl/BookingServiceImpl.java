@@ -17,6 +17,8 @@ import com.tour.bookingservice.repositories.BookingRepository;
 import com.tour.bookingservice.service.BookingService;
 import com.tour.bookingservice.service.PaymentServiceClient;
 import com.tour.bookingservice.service.TourServiceClient;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 @Service
 class BookingServiceImpl implements BookingService {
@@ -159,6 +161,32 @@ class BookingServiceImpl implements BookingService {
 			// Store the payment method that completed the payment
 			if (paymentMethod != null && !paymentMethod.isEmpty()) {
 				booking.setPaymentMethod(paymentMethod);
+			}
+			// Send notification about successful payment
+			try {
+				String notificationUrl = String.format(
+						"http://tour.phamhuuthuan.io.vn:8084/api/notifications/payment-success?userId=%d&tourId=%d&bookingId=%d",
+						booking.getUser_id(), booking.getTour_id(), bookingId);
+
+				// Create URL object
+				URL url = new URL(notificationUrl);
+				HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+				// Set up the request
+				connection.setRequestMethod("POST");
+				connection.setConnectTimeout(5000);
+				connection.setReadTimeout(5000);
+
+				// Get the response
+				int responseCode = connection.getResponseCode();
+
+				// Close the connection
+				connection.disconnect();
+
+				System.out.println("Payment notification sent with response: " + responseCode);
+			} catch (Exception e) {
+				// Log error but don't prevent booking update
+				System.err.println("Failed to send payment notification: " + e.getMessage());
 			}
 		} else if ("FAILED".equals(paymentStatus)) {
 			booking.setStatus(Booking.Status.CANCELLED);

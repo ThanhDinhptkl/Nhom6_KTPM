@@ -153,23 +153,23 @@ public class NotificationServiceImpl implements NotificationService {
             notification.setType("PAYMENT");
 
             // Tạo nội dung HTML với ảnh - sử dụng format ngắn gọn hơn
-            String detailedMessage = String.format(
+            notification.setMessage(String.format(
                     "<h3 style='color:#2c3e50'>Thanh toán tour '%s' thành công!</h3>" +
                             "<img src='%s' alt='Tour' style='max-width:100%%;height:auto;border-radius:8px;margin:10px 0'/>"
                             +
                             "<div style='background:#f8f9fa;padding:15px;border-radius:5px'>" +
-                            "<h4 style='color:#2c3e50;margin:0 0 10px'>Thông tin thanh toán:</h4>" +
+                            "<h4 style='color:#2c3e50;margin:0 0 10px'>Chi tiết thanh toán:</h4>" +
                             "<ul style='list-style:none;padding:0;margin:0'>" +
-                            "<li style='margin:5px 0'><b>Mã tour:</b> %d</li>" +
+                            "<li style='margin:5px 0'><b>Mã đặt tour:</b> %d</li>" +
                             "<li style='margin:5px 0'><b>Tour:</b> %s</li>" +
                             "<li style='margin:5px 0'><b>Địa điểm:</b> %s</li>" +
-                            "<li style='margin:5px 0'><b>Ngày đi:</b> %s</li>" +
+                            "<li style='margin:5px 0'><b>Ngày khởi hành:</b> %s</li>" +
                             "<li style='margin:5px 0'><b>Số người:</b> %d</li>" +
                             "<li style='margin:5px 0'><b>Tổng tiền:</b> %.2f VND</li>" +
                             "</ul>" +
                             "</div>" +
                             "<div style='margin-top:15px;padding:10px;background:#e8f5e9;border-radius:5px'>" +
-                            "<p style='margin:0;color:#2e7d32'>Chúng tôi sẽ liên hệ với bạn sớm nhất để cung cấp thêm thông tin.</p>"
+                            "<p style='margin:0;color:#2e7d32'>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi. Chúc bạn có chuyến đi vui vẻ!</p>"
                             +
                             "</div>",
                     tour.getTitle(),
@@ -179,9 +179,7 @@ public class NotificationServiceImpl implements NotificationService {
                     tour.getLocation(),
                     dateFormat.format(tour.getStart_date()),
                     booking.getNumber_of_people(),
-                    booking.getTotal_price());
-
-            notification.setMessage(detailedMessage);
+                    booking.getTotal_price()));
 
             // Lưu thông báo và gửi email
             Notification saved = notificationRepository.save(notification);
@@ -232,28 +230,31 @@ public class NotificationServiceImpl implements NotificationService {
             notification.setTitle("Đặt tour thành công");
             notification.setType("BOOKING");
             notification.setMessage(String.format(
-                    "Kính gửi %s,\n\n" +
-                            "Chúc mừng bạn đã đặt tour thành công!\n\n" +
-                            "Chi tiết đặt tour:\n" +
-                            "- Mã đặt tour: %d\n" +
-                            "- Tour: %s\n" +
-                            "- Địa điểm: %s\n" +
-                            "- Ngày khởi hành dự kiến: %s\n" +
-                            "- Số người: %d\n" +
-                            "- Tổng tiền: %.2f VND\n" +
-                            "- Ngày đặt: %s\n\n" +
-                            "Vui lòng tiến hành thanh toán để xác nhận đặt chỗ. Bạn có thể quản lý đặt tour của mình tại phần 'Tour đã đặt' trên website.\n\n"
+                    "<h3 style='color:#2c3e50'>Đặt tour '%s' thành công!</h3>" +
+                            "<img src='%s' alt='Tour' style='max-width:100%%;height:auto;border-radius:8px;margin:10px 0'/>"
                             +
-                            "Trân trọng,\n" +
-                            "Đội ngũ Tour Booking",
-                    customer.getName(),
+                            "<div style='background:#f8f9fa;padding:15px;border-radius:5px'>" +
+                            "<h4 style='color:#2c3e50;margin:0 0 10px'>Chi tiết đặt tour:</h4>" +
+                            "<ul style='list-style:none;padding:0;margin:0'>" +
+                            "<li style='margin:5px 0'><b>Mã đặt tour:</b> %d</li>" +
+                            "<li style='margin:5px 0'><b>Tour:</b> %s</li>" +
+                            "<li style='margin:5px 0'><b>Địa điểm:</b> %s</li>" +
+                            "<li style='margin:5px 0'><b>Ngày khởi hành:</b> %s</li>" +
+                            "<li style='margin:5px 0'><b>Số người:</b> %d</li>" +
+                            "<li style='margin:5px 0'><b>Tổng tiền:</b> %.2f VND</li>" +
+                            "</ul>" +
+                            "</div>" +
+                            "<div style='margin-top:15px;padding:10px;background:#e8f5e9;border-radius:5px'>" +
+                            "<p style='margin:0;color:#2e7d32'>Vui lòng tiến hành thanh toán để xác nhận đặt chỗ.</p>" +
+                            "</div>",
+                    tour.getTitle(),
+                    tour.getImage() != null ? tour.getImage() : "https://via.placeholder.com/400x300?text=No+Image",
                     booking.getId(),
                     tour.getTitle(),
                     tour.getLocation(),
-                    dateFormat.format(booking.getBooking_date()), // Use booking date as start date is not confirmed yet
+                    dateFormat.format(booking.getBooking_date()),
                     booking.getNumber_of_people(),
-                    booking.getTotal_price(),
-                    dateFormat.format(booking.getBooking_date())));
+                    booking.getTotal_price()));
 
             // Lưu thông báo và gửi email
             Notification saved = notificationRepository.save(notification);
